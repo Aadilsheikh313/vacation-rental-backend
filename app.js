@@ -35,6 +35,13 @@ app.use('/api/review', reviewRoutes);
 app.use('/api/booking', bookingRoutes);
 app.use('/api/invoice', invoiceRoutes); 
 app.use('/api/payment',paymentRoutes);
+app.get("/api/v1/test", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Backend is working ✅"
+  });
+});
+
 
 connectDB();
 
