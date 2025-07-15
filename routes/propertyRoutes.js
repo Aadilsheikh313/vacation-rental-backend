@@ -16,7 +16,7 @@ router.put("/edit/:id", isAuthorized, upload.single("image"), editProperty);
 router.delete("/soft-delete/:id", isAuthorized, softDeleteProperty);
 router.delete("/hard-delete/:id", isAuthorized, hardDeleteProperty);
 router.put("/reactivate/:id", isAuthorized, reactiveProperty);
-router.get("expired/my", isAuthorized, getMyExpiredProperty);
+router.get("/expired/my", isAuthorized, getMyExpiredProperty);
 
 // ✅ POST at the bottom or top (safe)
 router.post("/postProperty", isAuthorized, upload.single("image"), postProperty);

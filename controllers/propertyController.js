@@ -268,11 +268,6 @@ export const getMyProperties = catchAsyncError(async (req, res, next) => {
 
     const properties = await Property.find({ userId }).lean();
 
-
-    if (!properties || properties.length === 0) {
-        return next(new ErrorHandler("No properties found for this user", 404));
-    }
-
     res.status(200).json({
         success: true,
         count: properties.length,
