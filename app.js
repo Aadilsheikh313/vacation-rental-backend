@@ -17,11 +17,19 @@ import invoiceRoutes from "./routes/invoiceRoutes.js";
 const app = express();
 dotenv.config();
 
+const allowedOrigins = process.env.FRONTEND_URL.split(",");
+
 app.use(cors({
-    origin:[process.env.FRONTEND_URL],
-    methods:["GET", "POST", "DELETE", "PUT"],
-    credentials:true,
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("❌ Not allowed by CORS: " + origin));
+    }
+  },
+  credentials: true,
 }));
+
 
 app.use(cookieParser());
 app.use(express.json());
