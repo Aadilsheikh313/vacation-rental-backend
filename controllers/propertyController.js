@@ -270,8 +270,8 @@ export const getMyProperties = catchAsyncError(async (req, res, next) => {
 
     res.status(200).json({
         success: true,
-        count: properties.length,
-        properties,
+        count: 0,
+        properties: [],
     });
 });
 

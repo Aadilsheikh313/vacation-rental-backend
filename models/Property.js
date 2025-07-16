@@ -42,7 +42,7 @@ const propertySchema = new mongoose.Schema({
     location: {
         type: String,
         required: [true, "Please provied exact location "],
-        minLength: [20, "Property location must be contain at least 20 character!"],
+        minLength: [10, "Property location must be contain at least 20 character!"],
     },
     coordinates: {
         type: {

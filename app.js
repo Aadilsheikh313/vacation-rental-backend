@@ -13,6 +13,7 @@ import reviewRoutes from "./routes/reviewRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import invoiceRoutes from "./routes/invoiceRoutes.js";
+import geocodeRouter from "./routes/geocode.js";
 
 const app = express();
 dotenv.config();
@@ -43,6 +44,7 @@ app.use('/api/review', reviewRoutes);
 app.use('/api/booking', bookingRoutes);
 app.use('/api/invoice', invoiceRoutes); 
 app.use('/api/payment',paymentRoutes);
+app.use('/api', geocodeRouter);
 app.get("/api/v1/test", (req, res) => {
   res.status(200).json({
     success: true,
