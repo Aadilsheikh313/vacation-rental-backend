@@ -1,82 +1,116 @@
 import mongoose from "mongoose";
 
-
 const propertySchema = new mongoose.Schema({
-    title: {
-        type: String,
-        required: [true, "Please provide your Title!"],
-    },
+  title: {
+    type: String,
+    required: [true, "Please provide your Title!"],
+  },
 
-    description: {
-        type: String,
-        required: [true, "Please provide your description"],
-    },
-    image: {
-        public_id: {
-            type: String,
-            required: true
-        },
-        url: {
-            type: String,
-            required: true,
-        },
-    },
-    price: {
-        type: Number,
-        required: [true, "Please provide the property price!"],
-        min: [1, "Minimum price must be 1 rupee!"],
-    },
+  description: {
+    type: String,
+    required: [true, "Please provide your description"],
+  },
 
-    category: {
-        type: String,
-        required: [true, "Property category is required! "],
+  image: {
+    public_id: {
+      type: String,
+      required: true,
     },
-    country: {
-        type: String,
-        required: [true, "Property countery is required! "],
+    url: {
+      type: String,
+      required: true,
     },
-    city: {
-        type: String,
-        required: [true, "Property city is required! "],
-    },
-    location: {
-        type: String,
-        required: [true, "Please provied exact location "],
-        minLength: [10, "Property location must be contain at least 20 character!"],
+  },
+
+  price: {
+    type: Number,
+    required: [true, "Please provide the property price!"],
+    min: [1, "Minimum price must be 1 rupee!"],
+  },
+
+  category: {
+    type: String,
+    enum: [
+      'Hotels',
+      'Apartments',
+      'Villas',
+      'Guest Houses',
+      'Resorts',
+      'Farmhouses',
+      'Cottages',
+      'Bungalows',
+      'Homestays',
+      'Cabins',
+      'Treehouses',
+      'Boathouses',
+      'Hostels',
+      'Serviced Apartments',
+      'Tent Stays / Camping',
+      'Houseboats',
+      'Luxury Stays',
+    ],
+    required: true,
+  },
+
+  country: {
+    type: String,
+    required: [true, "Property country is required!"],
+  },
+
+  city: {
+    type: String,
+    required: [true, "Property city is required!"],
+    lowercase: true,
+  },
+
+  location: {
+    type: String,
+    required: [true, "Please provide the exact location"],
+    lowercase: true,
+    minLength: [10, "Property location must contain at least 10 characters!"],
+  },
+
+  coordinates: {
+    type: {
+      type: String,
+      enum: ['Point'],
+      default: 'Point',
     },
     coordinates: {
-        type: {
-            type: String,
-            enum: ['Point'],
-            default: 'Point',
-        },
-        coordinates: {
-            type: [Number], // [longitude, latitude]
-        },
+      type: [Number], // Format: [longitude, latitude]
+      required: true,
     },
-    expired: {
-        type: Boolean,
-        default: false,
-    },
+  },
 
-    propertyPostedOn: {
-        type: Date,
-        default: Date.now,
-    },
-    userId: {
-        type: mongoose.Schema.ObjectId,
-        ref: "User",
-        required: true,
-    },
-    avgRating: {
-        type: Number,
-        default: 0,
-    },
-    totalReviews: {
-        type: Number,
-        default: 0,
-    },
+  expired: {
+    type: Boolean,
+    default: false,
+  },
 
+  propertyPostedOn: {
+    type: Date,
+    default: Date.now,
+  },
+
+  userId: {
+    type: mongoose.Schema.ObjectId,
+    ref: "User",
+    required: true,
+  },
+
+  avgRating: {
+    type: Number,
+    default: 0,
+  },
+
+  totalReviews: {
+    type: Number,
+    default: 0,
+  },
 });
+
+// Index for geospatial queries
 propertySchema.index({ coordinates: "2dsphere" });
+
+// Export model
 export const Property = mongoose.model("Property", propertySchema);

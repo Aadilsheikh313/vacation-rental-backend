@@ -68,7 +68,7 @@ export const postProperty = catchAsyncError(async (req, res, next) => {
     // Upload image to Cloudinary
     const result = await streamUpload(req.file.buffer);
 
-   const { lng, lat } = await getCoordinatesFromLocation(location);
+    const { lng, lat } = await getCoordinatesFromLocation(location);
 
     // Create and save property in database
     const property = await Property.create({
@@ -84,9 +84,9 @@ export const postProperty = catchAsyncError(async (req, res, next) => {
             url: result.secure_url,
         },
         coordinates: {
-    type: "Point",
-    coordinates: [lng, lat],
-  },
+            type: "Point",
+            coordinates: [lng, lat],
+        },
         userId: req.user._id, // From authenticated user (set in auth middleware)
     });
 
@@ -293,4 +293,41 @@ export const getMyExpiredProperty = catchAsyncError(async (req, res, next) => {
     });
 });
 
+// Get all non-expired properties by category
+export const getPropertyByCategory = catchAsyncError(async (req, res, next) => {
+    const { category } = req.params;
+    const { city, location, priceMin, priceMax } = req.query;
 
+    if (!category) {
+        return next(new ErrorHandler("Category is required!", 400));
+    }
+
+    const formattedCategory = category.trim();
+    const validCategories = Property.schema.path("category").enumValues;
+
+    if (!validCategories.includes(formattedCategory)) {
+        return next(new ErrorHandler("Invalid category!", 400));
+    }
+
+    // Optional filters
+    const filter = {
+        category: formattedCategory,
+        expired: false,
+    };
+
+    if (city) filter.city = city.trim().toLowerCase();
+    if (location) filter.location = location.trim().toLowerCase();
+
+    if (priceMin || priceMax) {
+        filter.price = {};
+        if (priceMin) filter.price.$gte = Number(priceMin);
+        if (priceMax) filter.price.$lte = Number(priceMax);
+    }
+    const properties = await Property.find(filter);
+
+    res.status(200).json({
+        success: true,
+        count: properties.length,
+        properties,
+    });
+});

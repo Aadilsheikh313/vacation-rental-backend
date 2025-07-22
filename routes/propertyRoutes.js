@@ -1,5 +1,5 @@
 import express from "express";
-import {  editProperty, getAllPropertyPosted, getMyExpiredProperty, getMyProperties, getSingleProperty, hardDeleteProperty, postProperty, reactiveProperty, softDeleteProperty } from "../controllers/propertyController.js";
+import {  editProperty, getAllPropertyPosted, getMyExpiredProperty, getMyProperties, getPropertyByCategory, getSingleProperty, hardDeleteProperty, postProperty, reactiveProperty, softDeleteProperty } from "../controllers/propertyController.js";
 import { isAuthorized } from "../middlewares/authMiddleware.js";
 import { upload } from "../middlewares/uploadMiddleware.js";
 
@@ -20,5 +20,8 @@ router.get("/expired/my", isAuthorized, getMyExpiredProperty);
 
 // ✅ POST at the bottom or top (safe)
 router.post("/postProperty", isAuthorized, upload.single("image"), postProperty);
+
+//GET the Category wise property 
+router.get("/category/:category", getPropertyByCategory);
 
 export default router;
