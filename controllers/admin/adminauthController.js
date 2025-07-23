@@ -3,6 +3,7 @@ import { catchAsyncError } from "../../middlewares/catchAsyncError.js";
 import ErrorHandler from "../../middlewares/errorMiddleware.js";
 import { Admin } from "../../models/admin.js";
 import jwt from "jsonwebtoken";
+import { adminSchemaValidator } from "../../validators/adminValidator.js";
 
 // Send Token Function
 const sendToken = (admin, statusCode, res, message) => {
