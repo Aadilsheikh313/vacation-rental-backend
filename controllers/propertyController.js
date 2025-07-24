@@ -71,7 +71,7 @@ export const postProperty = catchAsyncError(async (req, res, next) => {
     const { lng, lat } = await getCoordinatesFromLocation(location);
 
     // Create and save property in database
-    const property = await Property.create({
+    const newproperty = await Property.create({
         title,
         description,
         price,
@@ -94,7 +94,7 @@ export const postProperty = catchAsyncError(async (req, res, next) => {
     res.status(201).json({
         success: true,
         message: "Property posted successfully.",
-        property,
+        newproperty,
     });
 });
 
@@ -270,9 +270,10 @@ export const getMyProperties = catchAsyncError(async (req, res, next) => {
 
     res.status(200).json({
         success: true,
-        count: 0,
-        properties: [],
+        count: properties.length,
+        properties,
     });
+
 });
 
 //get host only expired property Owner Only
