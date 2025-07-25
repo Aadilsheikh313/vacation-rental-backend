@@ -7,7 +7,12 @@ router.get("/geocode", async (req, res) => {
 
   try {
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`,
+      {
+        headers: {
+          "User-Agent": "VacationRentalApp/1.0 (your-email@example.com)", // 👈 Important!
+        },
+      }
     );
 
     const data = await response.json();
