@@ -6,6 +6,6 @@ import { getAllPropertyAdmin, getSinglePropertyAdmin } from "../../controllers/a
 const router = express.Router();
 
 router.get("/admin/all-properties", isAuthorized, isAdmin, getAllPropertyAdmin);
-router.get("/admin/property/:id",isAdmin, getSinglePropertyAdmin);
+router.get("/admin/property/:id", getSinglePropertyAdmin);
 
 export default router;
