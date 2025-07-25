@@ -19,7 +19,7 @@ export const getSinglePropertyAdmin = catchAsyncError(async (req, res, next) => 
     const propertyId = req.params.id;
     // ✅ 1. Get Property Details
     const property = await Property.findById(propertyId)
-        .populate("userId", "name email phone")
+        .populate("userId", "name email phone createdAt description")
         .lean();
 
     if (!property) {
