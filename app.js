@@ -16,6 +16,7 @@ import invoiceRoutes from "./routes/invoiceRoutes.js";
 import geocodeRouter from "./routes/geocode.js";
 import adminRoutes from "./routes/adminroutes/adimauthRoutes.js";
 import adminHomeDashRoutes from "./routes/adminroutes/adminHomeDashRoutes.js";
+import adminDashboardRoutes from "./routes/adminroutes/adminDashboardRoutes.js";
 
 const app = express();
 dotenv.config();
@@ -49,6 +50,7 @@ app.use('/api/payment',paymentRoutes);
 app.use('/api', geocodeRouter);
 app.use('/api/v1',adminRoutes);
 app.use('/api/v1',adminHomeDashRoutes);
+app.use('/api/v1',adminDashboardRoutes );
 app.get("/api/v1/test", (req, res) => {
   res.status(200).json({
     success: true,

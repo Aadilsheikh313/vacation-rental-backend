@@ -10,7 +10,7 @@ router.get("/geocode", async (req, res) => {
       `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`,
       {
         headers: {
-          "User-Agent": "VacationRentalApp/1.0 (your-email@example.com)", // 👈 Important!
+          "User-Agent": "VacationRentalApp/1.0 (your-email@example.com)", 
         },
       }
     );
