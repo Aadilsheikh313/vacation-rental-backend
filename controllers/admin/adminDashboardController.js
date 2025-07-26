@@ -4,14 +4,19 @@ import { Payment } from "../../models/Payment.js";
 
 
 export const getAllActiveBooking = catchAsyncError(async (req, res, next) => {
-    const bookings = await Booking.find({ bookingStatus: { $ne: "cancelled" } })
+    const bookings = await Booking.find({
+        bookingStatus: { $ne: "cancelled" },
+    })
         .populate("user", "name email phone")
-        .populate("property", "title location city price")
-        .lean(); // returns plain JS objects
+        .populate({
+            path: "property",
+            select: "title price location city image", // ensure these fields are selected
+        })
+        .lean();
 
-    // Attach payment method info from Payment model
     const populatedBookings = await Promise.all(
         bookings.map(async (booking) => {
+            // ✅ Now booking is defined — safe to log
             const payment = await Payment.findOne({ bookingId: booking._id });
 
             return {
