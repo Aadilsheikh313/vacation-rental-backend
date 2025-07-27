@@ -5,6 +5,7 @@ import { Payment } from "../../models/Payment.js";
 
 export const getAllActiveBooking = catchAsyncError(async (req, res, next) => {
     const bookings = await Booking.find({
+         userId: req.user._id,
         bookingStatus: { $ne: "cancelled" },
     })
         .populate("user", "name email phone") 
