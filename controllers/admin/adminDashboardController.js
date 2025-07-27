@@ -64,6 +64,7 @@ export const getAdminAllActiveBooking = catchAsyncError(async (req, res, next) =
     })
     .lean();
 
+
     const activeBookings = await Promise.all(bookings.map(async booking => {
         const payment = await Payment.findOne({ bookingId: booking._id });
 
@@ -90,6 +91,7 @@ export const getAdminAllActiveBooking = catchAsyncError(async (req, res, next) =
 
     res.status(200).json({
         success: true,
+        count: activeBookings.length, 
         activeBookings,
     });
 });
