@@ -73,6 +73,10 @@ const bookingSchema = new mongoose.Schema({
     enum: ["pending", "paid", "failed", "refunded"], // ✅ fix
     default: "pending",
   },
+  cancelReason: {
+    type: String,
+    default: ""
+  },
 
   createdAt: {
     type: Date,
