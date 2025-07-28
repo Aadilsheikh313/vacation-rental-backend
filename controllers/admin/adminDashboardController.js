@@ -250,3 +250,101 @@ const totalUpcomingAmount = detailedUpcomingBookings.reduce((sum, booking) => {
         upcomingBookings: detailedUpcomingBookings,
     });
 });
+
+// ✅ Get all past bookings - Admin
+export const getAdminAllPastBooking = catchAsyncError(async (req, res, next) => {
+    const today = new Date();
+
+    // 1. Find all past bookings where checkout date has passed and not cancelled
+    const pastBookings = await Booking.find({
+        bookingStatus: { $ne: "cancelled" },
+        checkOut: { $lt: today },
+    })
+        .populate({
+            path: "user", // Guest
+            select: "name email phone createdAt"
+        })
+        .populate({
+            path: "property",
+            select: "title price location city image userId",
+            populate: {
+                path: "userId", // Host
+                select: "name email phone createdAt"
+            }
+        })
+        .sort({ checkOut: -1 }) // Most recent past bookings first
+        .lean();
+
+    // 2. Filter out bookings with deleted properties (optional safety)
+    const filteredPastBookings = pastBookings.filter(booking => booking.property !== null);
+
+    // 3. Build full details for each past booking
+    const detailedPastBookings = await Promise.all(
+        filteredPastBookings.map(async (booking) => {
+            const payment = await Payment.findOne({ bookingId: booking._id });
+
+            const nights = Math.ceil(
+                (new Date(booking.checkOut) - new Date(booking.checkIn)) / (1000 * 60 * 60 * 24)
+            );
+            const totalAmount = (booking.property?.price || 0) * nights;
+
+            return {
+                bookingId: booking._id,
+                bookingStatus: booking.bookingStatus,
+                createdAt: booking.createdAt,
+
+                guest: {
+                    id: booking.user?._id,
+                    name: booking.user?.name,
+                    email: booking.user?.email,
+                    phone: booking.user?.phone,
+                    joinedAt: booking.user?.createdAt,
+                },
+
+                host: {
+                    id: booking.property?.userId?._id,
+                    name: booking.property?.userId?.name,
+                    email: booking.property?.userId?.email,
+                    phone: booking.property?.userId?.phone,
+                    joinedAt: booking.property?.userId?.createdAt,
+                },
+
+                property: {
+                    id: booking.property?._id,
+                    title: booking.property?.title,
+                    price: booking.property?.price,
+                    city: booking.property?.city,
+                    location: booking.property?.location,
+                    image: booking.property?.image,
+                    totalAmount,
+                },
+
+                bookingDates: {
+                    checkIn: booking.checkIn,
+                    checkOut: booking.checkOut,
+                    nights,
+                },
+
+                paymentMethod: booking.paymentMethod || "Not specified",
+                paymentStatus: booking.paymentStatus || "Pending",
+                paymentDetails: payment || {
+                    status: "Not Paid",
+                    method: "N/A"
+                },
+            };
+        })
+    );
+
+    // 4. Total amount earned from past bookings
+    const totalPastAmount = detailedPastBookings.reduce((sum, booking) => {
+        return sum + (booking.property?.totalAmount || 0);
+    }, 0);
+
+    // 5. Send response
+    res.status(200).json({
+        success: true,
+        count: detailedPastBookings.length,
+        totalPastAmount,
+        pastBookings: detailedPastBookings,
+    });
+});
