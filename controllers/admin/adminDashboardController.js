@@ -343,7 +343,7 @@ export const getAdminAllPastBooking = catchAsyncError(async (req, res, next) => 
     // 5. Send response
     res.status(200).json({
         success: true,
-        count: detailedPastBookings.length,
+        totalPastCount: detailedPastBookings.length,
         totalPastAmount,
         pastBookings: detailedPastBookings,
     });
