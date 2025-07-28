@@ -343,8 +343,61 @@ export const getAdminAllPastBooking = catchAsyncError(async (req, res, next) => 
     // 5. Send response
     res.status(200).json({
         success: true,
+        count: detailedPastBookings.length,
         totalPastCount: detailedPastBookings.length,
         totalPastAmount,
         pastBookings: detailedPastBookings,
     });
+});
+
+//Get all Amount 
+export const getTotalAmount = catchAsyncError(async (req, res, next) => {
+    try {
+        // 1. Get all bookings that are NOT cancelled
+        const bookings = await Booking.find({ bookingStatus: { $ne: "cancelled" } });
+
+        // 2. Calculate total amount
+        let totalAmount = 0;
+
+        for (const booking of bookings) {
+            const nights = Math.ceil(
+                (new Date(booking.checkOut) - new Date(booking.checkIn)) / (1000 * 60 * 60 * 24)
+            );
+
+            // You might want to handle missing property.price safely
+            const price = booking.property?.price || 0;
+            totalAmount += price * nights;
+        }
+
+        res.status(200).json({
+            success: true,
+            totalAmount,
+        });
+
+    } catch (error) {
+        console.error("Error calculating total amount:", error);
+        res.status(500).json({
+            success: false,
+            message: "Something went wrong while calculating total booking amount",
+        });
+    }
+});
+
+//Get all booking count
+export const getTotalBooking = catchAsyncError(async (req, res, next) => {
+    try {
+        const bookings = await Booking.find({ bookingStatus: { $ne: "cancelled" } });
+
+        res.status(200).json({
+            success: true,
+            totalBooking: bookings.length,
+        });
+
+    } catch (error) {
+        console.error("Error calculating total booking:", error);
+        res.status(500).json({
+            success: false,
+            message: "Something went wrong while calculating total bookings",
+        });
+    }
 });
