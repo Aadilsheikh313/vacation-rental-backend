@@ -1,6 +1,7 @@
-import cron from 'node-cron';
-import User from '../models/User.js';
-import Metrics from '../models/Metrics.js'; // You must create this model
+import cron from 'node-cron'; 
+import Metrics from '../models/Metrics.js'; 
+import { Booking } from '../models/Booking.js';
+import { User } from '../models/User.js';
 
 cron.schedule('0 0 * * *', async () => {
     const now = new Date();
@@ -25,7 +26,7 @@ cron.schedule('0 0 * * *', async () => {
         { $group: { _id: null, total: { $sum: "$amount" } } }
     ]);
 
-    await Metrics.create({
+    await  Metrics.create({
         date: now,
         totalUsers,
         dailyActive,

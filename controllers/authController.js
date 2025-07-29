@@ -26,7 +26,7 @@ export const register = catchAsyncError(async (req, res, next) => {
 });
 
 export const login = catchAsyncError(async (req, res, next) => {
-    
+
     const { role, email, password } = req.body;
 
 
@@ -34,11 +34,7 @@ export const login = catchAsyncError(async (req, res, next) => {
         return next(new ErrorHandler("Please provide email, password, role", 400));
     }
 
-   const user = await User.findOne({ email: email.toLowerCase() }).select("+password");
-
-
-    console.log("USER", user);
-    
+    const user = await User.findOne({ email: email.toLowerCase() }).select("+password");
 
 
     if (!user) {
@@ -51,6 +47,10 @@ export const login = catchAsyncError(async (req, res, next) => {
     if (user.role !== role) {
         return next(new ErrorHandler("User with role is not found!", 400));
     }
+
+    user.lastLogin = new Date();
+    user.lastActiveAt = new Date();
+    await user.save();
     sendToken(user, 200, res, "User logged in successfully!");
 })
 

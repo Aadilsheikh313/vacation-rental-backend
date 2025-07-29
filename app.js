@@ -5,9 +5,7 @@ import cookieParser from "cookie-parser";
 import { connectDB } from "./config/db.js";
 
 import { errorMiddleware } from "./middlewares/errorMiddleware.js";
-import { updateLastActive } from './middlewares/updateLastActive.js';
-
-
+import { updateActivity } from './middlewares/updateLastActive.js';
 
 
 import authRoutes from "./routes/authRoutes.js";
@@ -20,6 +18,7 @@ import geocodeRouter from "./routes/geocode.js";
 import adminRoutes from "./routes/adminroutes/adimauthRoutes.js";
 import adminHomeDashRoutes from "./routes/adminroutes/adminHomeDashRoutes.js";
 import adminDashboardRoutes from "./routes/adminroutes/adminDashboardRoutes.js";
+import adminHostRoutes from "./routes/adminroutes/adminHostRoutes.js";
 
 const app = express();
 dotenv.config();
@@ -41,7 +40,6 @@ app.use(cors({
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({extended:true}));
-app.use(updateLastActive);
 
 
 
@@ -56,6 +54,7 @@ app.use('/api', geocodeRouter);
 app.use('/api/v1',adminRoutes);
 app.use('/api/v1',adminHomeDashRoutes);
 app.use('/api/v1',adminDashboardRoutes );
+app.use('/api/v1',adminHostRoutes);
 app.get("/api/v1/test", (req, res) => {
   res.status(200).json({
     success: true,
@@ -67,6 +66,7 @@ app.get("/api/v1/test", (req, res) => {
 connectDB();
 
 app.use(errorMiddleware);
+app.use(updateActivity);
 
 export  default app;
 

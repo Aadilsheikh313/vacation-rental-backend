@@ -42,6 +42,14 @@ const userSchema = new mongoose.Schema({
         required: [true, "Please provide your role"],
         enum: ["guest", "host", "Guest", "Host"],
     },
+    lastLogin: {
+        type: Date,
+        default: null,
+    },
+    lastActiveAt: {
+        type: Date,
+        default: null,
+    },
     createdAt: {
         type: Date,
         default: Date.now,
