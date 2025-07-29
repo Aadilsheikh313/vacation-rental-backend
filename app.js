@@ -19,7 +19,7 @@ import adminRoutes from "./routes/adminroutes/adimauthRoutes.js";
 import adminHomeDashRoutes from "./routes/adminroutes/adminHomeDashRoutes.js";
 import adminDashboardRoutes from "./routes/adminroutes/adminDashboardRoutes.js";
 import adminHostRoutes from "./routes/adminroutes/adminHostRoutes.js";
-
+import adminGuestRoutes from "./routes/adminroutes/adminGuestRoutes.js";
 const app = express();
 dotenv.config();
 
@@ -55,6 +55,7 @@ app.use('/api/v1',adminRoutes);
 app.use('/api/v1',adminHomeDashRoutes);
 app.use('/api/v1',adminDashboardRoutes );
 app.use('/api/v1',adminHostRoutes);
+app.use('/api/v1',adminGuestRoutes);
 app.get("/api/v1/test", (req, res) => {
   res.status(200).json({
     success: true,
