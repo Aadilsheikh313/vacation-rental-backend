@@ -40,10 +40,18 @@ export const login = catchAsyncError(async (req, res, next) => {
     if (!user) {
         return next(new ErrorHandler("Invalid Email or Password", 400));
     }
+
+    if (user.isBanned) {
+    return next(new ErrorHandler("Your account has been banned.", 403));
+}
+
     const isPasswordMatched = await user.comparePassword(password);
     if (!isPasswordMatched) {
         return next(new ErrorHandler("Invalid Email or Password", 400));
     }
+
+    user.loginCount = (user.loginCount || 0) + 1;
+
     if (user.role !== role) {
         return next(new ErrorHandler("User with role is not found!", 400));
     }

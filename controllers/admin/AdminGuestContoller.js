@@ -10,6 +10,7 @@ export const getTotalGuestRegister = catchAsyncError(async (req, res, next) => {
     res.status(200).json({
         success: true,
         totalGuest: totalGuests,
-        message: `Total guests: ${totalGuests}`
+        message: `Total Guest: ${totalGuests}`
     });
 });
+

@@ -50,6 +50,15 @@ const userSchema = new mongoose.Schema({
         type: Date,
         default: null,
     },
+    loginCount: {
+        type: Number,
+        default: 0,
+    },
+    isBanned: {
+        type: Boolean,
+        default: false,
+    },
+
     createdAt: {
         type: Date,
         default: Date.now,

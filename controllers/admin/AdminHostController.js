@@ -1,6 +1,6 @@
 import { catchAsyncError } from "../../middlewares/catchAsyncError.js";
 import { User } from "../../models/User.js";
-
+import {Property} from "../../models/Property.js"
 
 export const getTotalHosts = catchAsyncError(async(req, res, next) =>{
     const totalHosts = await User.countDocuments({
@@ -10,6 +10,38 @@ export const getTotalHosts = catchAsyncError(async(req, res, next) =>{
      res.status(200).json({
         success: true,
         totalHosts,
-        message: `Total  hosts: ${totalHosts}`
+        message: `Total  Hosts: ${totalHosts}`
     });
+});
+
+
+export const getAdminAllHosts = catchAsyncError(async (req, res, next) => {
+  // 1️⃣ Get all users with role "host"
+  const hosts = await User.find({ role: { $in: ["host", "Host"] } }).select("-password");
+
+  // 2️⃣ Attach properties to each host
+  const enrichedHosts = await Promise.all(
+    hosts.map(async (host) => {
+      const properties = await Property.find({ userId: host._id })
+        .select("title location price image.url propertyPostedOn expired");
+
+      return {
+        _id: host._id,
+        name: host.name,
+        email: host.email,
+        phone: host.phone,
+        isBanned: host.isBanned,
+        lastLogin: host.lastLogin,
+        lastActiveAt: host.lastActiveAt,
+        createdAt: host.createdAt,
+        propertyCount: properties.length,
+        properties,
+      };
+    })
+  );
+
+  res.status(200).json({
+    success: true,
+    hosts: enrichedHosts,
+  });
 });
