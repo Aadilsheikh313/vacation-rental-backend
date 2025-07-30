@@ -45,3 +45,39 @@ export const getAdminAllHosts = catchAsyncError(async (req, res, next) => {
     hosts: enrichedHosts,
   });
 });
+
+export const getAdminAllActiveHosts = catchAsyncError(async (req, res, next) => {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
+
+    const activeHosts = await User.find({
+        role: { $in: ["host", "Host"] },
+        lastActiveAt: { $gte: sevenDaysAgo }
+    }).select("-password").lean();
+
+    const enrichedHosts = await Promise.all(
+        activeHosts.map(async (host) => {
+            const properties = await Property.find({ userId: host._id })
+                .select("title location price image.url propertyPostedOn expired");
+
+            return {
+                _id: host._id,
+                name: host.name,
+                email: host.email,
+                phone: host.phone,
+                isBanned: host.isBanned,
+                lastLogin: host.lastLogin,
+                lastActiveAt: host.lastActiveAt,
+                createdAt: host.createdAt,
+                propertyCount: properties.length,
+                properties,
+            };
+        })
+    );
+
+    res.status(200).json({
+        success: true,
+        count: enrichedHosts.length,
+        hosts: enrichedHosts,
+        message: `${enrichedHosts.length} hosts active in last 7 days.`
+    });
+});
