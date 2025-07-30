@@ -29,7 +29,6 @@ export const login = catchAsyncError(async (req, res, next) => {
 
     const { role, email, password } = req.body;
 
-
     if (!role || !email || !password) {
         return next(new ErrorHandler("Please provide email, password, role", 400));
     }
@@ -42,8 +41,8 @@ export const login = catchAsyncError(async (req, res, next) => {
     }
 
     if (user.isBanned) {
-    return next(new ErrorHandler("Your account has been banned.", 403));
-}
+        return next(new ErrorHandler("Your account has been banned.", 403));
+    }
 
     const isPasswordMatched = await user.comparePassword(password);
     if (!isPasswordMatched) {
@@ -56,9 +55,15 @@ export const login = catchAsyncError(async (req, res, next) => {
         return next(new ErrorHandler("User with role is not found!", 400));
     }
 
-    user.lastLogin = new Date();
-    user.lastActiveAt = new Date();
-    await user.save();
+    await User.updateOne(
+        { _id: user._id },
+        {
+            lastLogin: new Date(),
+            lastActiveAt: new Date(),
+            $inc: { loginCount: 1 }
+        }
+    );
+
     sendToken(user, 200, res, "User logged in successfully!");
 })
 
