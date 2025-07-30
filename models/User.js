@@ -74,10 +74,10 @@ userSchema.pre("save", async function (next) {
         this.name = this.name.charAt(0).toUpperCase() + this.name.slice(1);
     }
     if (!this.isModified("password")) {
-     return next();
+        return next();
     }
     this.password = await bcrypt.hash(this.password, 10);
- next();
+    next();
 
 });
 
