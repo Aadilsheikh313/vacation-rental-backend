@@ -123,3 +123,112 @@ export const getAdminAllOnlineHosts = catchAsyncError(async (req, res, next) => 
     });
 });
 
+
+export const getAdminNewRegisterHosts = catchAsyncError(async (req, res, next) => {
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0); // 👈 Set to 12:00 AM today
+
+  const newHosts = await User.find({
+    role: { $in: ["host", "Host"] },
+    createdAt: { $gte: startOfDay },
+  }).select("-password").lean();
+
+  const enrichedHosts = await Promise.all(
+    newHosts.map(async (host) => {
+      const properties = await Property.find({ userId: host._id })
+        .select("title location price image.url propertyPostedOn expired");
+
+      return {
+        _id: host._id,
+        name: host.name,
+        email: host.email,
+        phone: host.phone,
+        isBanned: host.isBanned,
+        lastLogin: host.lastLogin,
+        lastActiveAt: host.lastActiveAt,
+        createdAt: host.createdAt,
+        propertyCount: properties.length,
+        properties,
+      };
+    })
+  );
+
+  res.status(200).json({
+    success: true,
+    count: enrichedHosts.length,
+    hosts: enrichedHosts,
+    message: `${enrichedHosts.length} new host(s) registered today.`,
+  });
+});
+
+export const getAdminLogoutHosts = catchAsyncError(async (req, res, next) => {
+  const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+
+  const logoutHosts = await User.find({
+    role: { $in: ["host", "Host"] },
+    lastActiveAt: { $lt: fifteenMinutesAgo },
+    isBanned: false // Optional: Exclude banned users
+  }).select("-password").lean();
+
+  const enrichedHosts = await Promise.all(
+    logoutHosts.map(async (host) => {
+      const properties = await Property.find({ userId: host._id })
+        .select("title location price image.url propertyPostedOn expired");
+
+      return {
+        _id: host._id,
+        name: host.name,
+        email: host.email,
+        phone: host.phone,
+        isBanned: host.isBanned,
+        lastLogin: host.lastLogin,
+        lastActiveAt: host.lastActiveAt,
+        createdAt: host.createdAt,
+        propertyCount: properties.length,
+        properties,
+      };
+    })
+  );
+
+  res.status(200).json({
+    success: true,
+    count: enrichedHosts.length,
+    hosts: enrichedHosts,
+    message: `${enrichedHosts.length} host(s) are currently logged out (inactive >15 min).`,
+  });
+});
+
+export const getAdminBannedHosts = catchAsyncError(async (req, res, next) => {
+  const bannedHosts = await User.find({
+    role: { $in: ["host", "Host"] },
+    isBanned: true
+  }).select("-password").lean();
+
+  const enrichedHosts = await Promise.all(
+    bannedHosts.map(async (host) => {
+      const properties = await Property.find({ userId: host._id })
+        .select("title location price image.url propertyPostedOn expired");
+
+      return {
+        _id: host._id,
+        name: host.name,
+        email: host.email,
+        phone: host.phone,
+        isBanned: host.isBanned,
+        lastLogin: host.lastLogin,
+        lastActiveAt: host.lastActiveAt,
+        createdAt: host.createdAt,
+        propertyCount: properties.length,
+        properties,
+      };
+    })
+  );
+
+  res.status(200).json({
+    success: true,
+    count: enrichedHosts.length,
+    hosts: enrichedHosts,
+    message: `${enrichedHosts.length} banned host(s) found.`,
+  });
+});
+

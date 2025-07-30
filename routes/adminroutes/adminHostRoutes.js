@@ -5,6 +5,9 @@ import {
     getAdminAllActiveHosts,
     getAdminAllHosts,
     getAdminAllOnlineHosts,
+    getAdminBannedHosts,
+    getAdminLogoutHosts,
+    getAdminNewRegisterHosts,
     getTotalHosts
 } from "../../controllers/admin/AdminHostController.js";
 
@@ -15,6 +18,9 @@ router.get("/admin/total-hosts", isAuthorized, isAdmin, getTotalHosts);
 router.get("/admin/all-hosts", isAuthorized, isAdmin, getAdminAllHosts);
 router.get("/admin/active-hosts", isAuthorized, isAdmin, getAdminAllActiveHosts);
 router.get("/admin/online-hosts", isAuthorized, isAdmin, getAdminAllOnlineHosts);
+router.get("/admin/new-hosts", isAuthorized, isAdmin, getAdminNewRegisterHosts);
+router.get("/admin/logout-hosts", isAuthorized, isAdmin, getAdminLogoutHosts);
+router.get("/admin/banned-hosts", isAuthorized, isAdmin, getAdminBannedHosts);
 export default router;
 
 
