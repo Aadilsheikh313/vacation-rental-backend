@@ -57,6 +57,32 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    bannedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Admin",
+        default: null,
+    },
+    bannedAt: {
+        type: Date,
+        default: null,
+    },
+    unbannedAt: {
+        type: Date,
+        default: null,
+    },
+    banReason: {
+        type: String,
+        default: null,
+        trim: true,
+        maxlength: 500,
+    },
+    unbanNote: {
+        type: String,
+        default: null,
+        trim: true,
+        maxlength: 500,
+    },
+
 
     createdAt: {
         type: Date,

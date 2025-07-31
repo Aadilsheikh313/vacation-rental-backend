@@ -20,8 +20,8 @@ export const isAuthorized = catchAsyncError(async (req, res, next) => {
   const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
 
   let user = await User.findById(decoded.id || decoded._id); // ✅ Safe
-  
-   // ❌ If not found in User, try Admin model
+
+  // ❌ If not found in User, try Admin model
   if (!user) {
     user = await Admin.findById(decoded.id || decoded._id);
     if (!user) {
@@ -29,7 +29,12 @@ export const isAuthorized = catchAsyncError(async (req, res, next) => {
     }
   }
 
+  if (user.isBanned) {
+    return next(new ErrorHandler("Your account has been banned.", 403));
+  }
+
   req.user = user;
   req.user.role = decoded.role;
   next();
+
 });
