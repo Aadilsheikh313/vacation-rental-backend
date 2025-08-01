@@ -76,10 +76,11 @@ export const adminUnbanUser = catchAsyncError(async (req, res, next) => {
 });
 
 
+// ✅ Get all ban/unban logs (with complete user/admin info)
 export const getBanLogs = catchAsyncError(async (req, res, next) => {
   const logs = await Log.find()
-    .populate("performedBy", "name email") // admin details
-    .populate("targetUser", "name email")  // user/host details
+    .populate("performedBy", "name email phone createdAt") // Admin
+    .populate("targetUser", "name email phone createdAt isBanned bannedAt unbannedAt bannedBy banReason unbanNote") // User
     .sort({ createdAt: -1 });
 
   res.status(200).json({
