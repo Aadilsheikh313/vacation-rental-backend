@@ -16,42 +16,56 @@ export const getTotalGuestRegister = catchAsyncError(async (req, res, next) => {
 });
 
 export const getAdminAllGuests = catchAsyncError(async (req, res, next) => {
-  // 1️⃣ Get all users with role "guest"
   const guests = await User.find({ role: { $in: ["guest", "Guest"] } }).select("-password");
 
-  // 2️⃣ Attach properties to each guest booking
-  const enrichedGuests = await Promise.all(
+  const guestsWithBookings = await Promise.all(
     guests.map(async (guest) => {
       const bookings = await Booking.find({ user: guest._id })
-        .populate("property", "title location price image.url")
+        .populate({
+          path: "property",
+          populate: {
+            path: "userId",
+            model: "User",
+            select: "name email phone",
+          },
+        })
+        .sort({ createdAt: -1 });
+
+      const formattedBookings = bookings.map((booking) => ({
+        propertyTitle: booking.property?.title || "Untitled",
+        location: booking.property?.location || "N/A",
+        price: booking.property?.price || 0,
+        image: booking.property?.image?.url || "",
+        bookedOn: booking.createdAt,
+        checkIn: booking.checkIn,
+        checkOut: booking.checkOut,
+        status: booking.bookingStatus,
+        host: {
+          name: booking.property?.userId?.name || "N/A",
+          email: booking.property?.userId?.email || "N/A",
+          phone: booking.property?.userId?.phone || "N/A",
+        },
+      }));
 
       return {
         _id: guest._id,
         name: guest.name,
         email: guest.email,
         phone: guest.phone,
-         createdAt: guest.createdAt, // ⬅️ add this
-  isBanned: guest.isBanned,
+        createdAt: guest.createdAt,
+        isBanned: guest.isBanned,
         totalBookings: bookings.length,
-        bookings: bookings.map(b => ({
-          propertyTitle: b.property?.title || "Property not found",
-          location: b.property?.location || "-",
-          price: b.property.price || "-",
-          image: b.property.image.url || "-",
-          checkIn: b.checkIn || "-",
-          checkOut: b.checkOut || "-",
-          status: b.bookingStatus || "-",
-        }))
+        bookings: formattedBookings,
       };
     })
   );
 
   res.status(200).json({
     success: true,
-    guests: enrichedGuests,
-    message: `Fetched guest booking history.`,
+    guests: guestsWithBookings,
   });
 });
+
 
 // export const getAdminAllActiveGuests = catchAsyncError(async (req, res, next) => {
 //     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
