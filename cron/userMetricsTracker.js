@@ -18,8 +18,8 @@ cron.schedule('0 0 * * *', async () => {
         // 🧍‍♂️ USER METRICS (Guest + Host separated)
         const totalGuests = await User.countDocuments({ role: { $in: ["guest", "Guest"] } });
         const newGuestsToday = await User.countDocuments({ role: { $in: ["guest", "Guest"] }, createdAt: { $gte: startOfDay } });
-        const returningGuests = await User.countDocuments({ role: { $in: ["guest", "Guest"] }, lastLogin: { $lt: startOfDay } });
-        const dailyActiveGuests = await User.countDocuments({ role: { $in: ["guest", "Guest"] }, lastLogin: { $gte: startOfDay } });
+        const dailyActiveGuests = await User.countDocuments({ role: { $in: ["guest", "Guest"] }, lastLogin: { $lt: startOfDay } });
+        const activeGuests = await User.countDocuments({ role: { $in: ["guest", "Guest"] }, lastLogin: { $gte: startOfDay } });
         const onlineGuests = await User.countDocuments({ role: { $in: ["guest", "Guest"] }, lastActiveAt: { $gte: new Date(Date.now() - 15 * 60 * 1000) } });
         const logoutGuests = await User.countDocuments({ role: { $in: ["guest", "Guest"] }, lastActiveAt: { $lt: new Date(Date.now() - 15 * 60 * 1000) } });
         const bannedGuests = await User.countDocuments({ role: { $in: ["guest", "Guest"] }, isBanned: true });
@@ -43,8 +43,8 @@ cron.schedule('0 0 * * *', async () => {
         await Metrics.create({
             totalGuests,
             newGuestsToday,
-            returningGuests,
             dailyActiveGuests,
+            activeGuests,
             onlineGuests,
             logoutGuests,
             bannedGuests,
