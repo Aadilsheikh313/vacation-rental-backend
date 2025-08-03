@@ -26,10 +26,11 @@ export const getAdminAllGuests = catchAsyncError(async (req, res, next) => {
           populate: {
             path: "userId",
             model: "User",
-            select: "name email phone",
+            select: "name email phone", 
           },
         })
         .sort({ createdAt: -1 });
+          console.log("Guest ID:", guest._id);
 
       const formattedBookings = bookings.map((booking) => ({
         propertyTitle: booking.property?.title || "Untitled",
@@ -59,7 +60,8 @@ export const getAdminAllGuests = catchAsyncError(async (req, res, next) => {
       };
     })
   );
-
+console.log("Bookings found:", bookings.length);
+console.log("Bookings found:", formattedBookings);
   res.status(200).json({
     success: true,
     guests: guestsWithBookings,

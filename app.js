@@ -21,6 +21,7 @@ import adminDashboardRoutes from "./routes/adminroutes/adminDashboardRoutes.js";
 import adminHostRoutes from "./routes/adminroutes/adminHostRoutes.js";
 import adminGuestRoutes from "./routes/adminroutes/adminGuestRoutes.js";
 import adminBannedRoutes from "./routes/adminroutes/adminBannedUserRoutes.js";
+import adminPropertyRoutes from "./routes/adminroutes/activePropertyRoutes.js";
 
 const app = express();
 dotenv.config();
@@ -59,6 +60,7 @@ app.use('/api/v1',adminDashboardRoutes );
 app.use('/api/v1',adminHostRoutes);
 app.use('/api/v1',adminGuestRoutes);
 app.use('/api/banned',adminBannedRoutes);
+app.use("/api/active/inactive",adminPropertyRoutes);
 app.get("/api/v1/test", (req, res) => {
   res.status(200).json({
     success: true,

@@ -86,7 +86,35 @@ const propertySchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
-
+  inActiveBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Admin",
+    default: null,
+  },
+   inActiveAt: {
+        type: Date,
+        default: null,
+    },
+    ActiveAt: {
+        type: Date,
+        default: null,
+    },
+    inActiveReason: {
+        type: String,
+        default: null,
+        trim: true,
+        maxlength: 500,
+    },
+    ActiveNote: {
+        type: String,
+        default: null,
+        trim: true,
+        maxlength: 500,
+    },
+  lastChangedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
   propertyPostedOn: {
     type: Date,
     default: Date.now,
