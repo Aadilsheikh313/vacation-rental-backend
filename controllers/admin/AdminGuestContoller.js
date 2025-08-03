@@ -60,8 +60,6 @@ export const getAdminAllGuests = catchAsyncError(async (req, res, next) => {
       };
     })
   );
-console.log("Bookings found:", bookings.length);
-console.log("Bookings found:", formattedBookings);
   res.status(200).json({
     success: true,
     guests: guestsWithBookings,
