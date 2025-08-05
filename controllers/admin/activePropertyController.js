@@ -23,7 +23,7 @@ export const inActiveProperty = catchAsyncError(async (req, res, next) => {
   property.expired = true;
   property.inActiveBy = adminId;
   property.inActiveAt = new Date();
-  property.inActiveReason = reason || "Bad Location";
+  property.inActiveReason = reason || "Violation of rules";
 
 
   await property.save();
@@ -62,6 +62,7 @@ if (!property.inActiveBy || property.inActiveBy.toString() !== adminId.toString(
   property.expired = false;
   property.inActiveBy = null;
   property.inActiveAt = null;
+  property.ActiveBy = adminId;
   property.ActiveNote = note  || "The Good location property";
   property.ActiveAt = new Date();
 
@@ -76,7 +77,7 @@ if (!property.inActiveBy || property.inActiveBy.toString() !== adminId.toString(
 
   res.status(200).json({ 
     success: true,
-    message: `Property ${property.title} activatedsuccessfully.` });
+    message: `Property ${property.title} activated successfully.` });
 });
 
 // 🔍 Get Property Status PropertyLogs (History)
