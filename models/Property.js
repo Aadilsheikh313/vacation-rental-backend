@@ -48,6 +48,7 @@ const propertySchema = new mongoose.Schema({
       'Tent Stays / Camping',
       'Houseboats',
       'Luxury Stays',
+      'Bar',
     ],
     required: true,
   },
@@ -77,7 +78,7 @@ const propertySchema = new mongoose.Schema({
       default: 'Point',
     },
     coordinates: {
-      type: [Number], // Format: [longitude, latitude]
+      type: [Number], 
       required: true,
     },
   },

@@ -22,6 +22,7 @@ import adminHostRoutes from "./routes/adminroutes/adminHostRoutes.js";
 import adminGuestRoutes from "./routes/adminroutes/adminGuestRoutes.js";
 import adminBannedRoutes from "./routes/adminroutes/adminBannedUserRoutes.js";
 import adminPropertyRoutes from "./routes/adminroutes/activePropertyRoutes.js";
+import adminPostRoutes from "./routes/adminroutes/adminPostExperienceRoutes.js";
 
 const app = express();
 dotenv.config();
@@ -29,7 +30,7 @@ dotenv.config();
 const allowedOrigins = process.env.FRONTEND_URL.split(",");
 
 app.use(cors({
-  origin: function (origin, callback) { 
+  origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -42,25 +43,24 @@ app.use(cors({
 
 app.use(cookieParser());
 app.use(express.json());
-app.use(express.urlencoded({extended:true}));
+app.use(express.urlencoded({ extended: true }));
 
 
-
-
-app.use('/api/auth',authRoutes);
-app.use('/api/property',propertyRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/property', propertyRoutes);
 app.use('/api/review', reviewRoutes);
 app.use('/api/booking', bookingRoutes);
-app.use('/api/invoice', invoiceRoutes); 
-app.use('/api/payment',paymentRoutes);
+app.use('/api/invoice', invoiceRoutes);
+app.use('/api/payment', paymentRoutes);
 app.use('/api', geocodeRouter);
-app.use('/api/v1',adminRoutes);
-app.use('/api/v1',adminHomeDashRoutes);
-app.use('/api/v1',adminDashboardRoutes );
-app.use('/api/v1',adminHostRoutes);
-app.use('/api/v1',adminGuestRoutes);
-app.use('/api/banned',adminBannedRoutes);
-app.use("/api/active/inactive",adminPropertyRoutes);
+app.use('/api/v1', adminRoutes);
+app.use('/api/v1', adminHomeDashRoutes);
+app.use('/api/v1', adminDashboardRoutes);
+app.use('/api/v1', adminHostRoutes);
+app.use('/api/v1', adminGuestRoutes);
+app.use('/api/banned', adminBannedRoutes);
+app.use("/api/active/inactive", adminPropertyRoutes);
+app.use("/api/adminpost", adminPostRoutes);
 app.get("/api/v1/test", (req, res) => {
   res.status(200).json({
     success: true,
@@ -74,5 +74,5 @@ connectDB();
 app.use(errorMiddleware);
 app.use(updateActivity);
 
-export  default app;
+export default app;
 

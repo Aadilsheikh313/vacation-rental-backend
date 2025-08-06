@@ -65,6 +65,7 @@ if (!property.inActiveBy || property.inActiveBy.toString() !== adminId.toString(
   property.ActiveBy = adminId;
   property.ActiveNote = note  || "The Good location property";
   property.ActiveAt = new Date();
+  property.lastChangedBy = adminId;
 
   await property.save();
 
