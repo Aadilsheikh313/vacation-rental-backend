@@ -35,7 +35,6 @@ export const adminRegister = catchAsyncError(async (req, res, next) => {
   if (secretCode !== process.env.ADMIN_SECRET_CODE) {
     return next(new ErrorHandler("Invalid admin secret code", 403));
   }
-console.log("SECRET COde",process.env.ADMIN_SECRET_CODE);
 
   const existingAdmin = await Admin.findOne({ email });
   console.log("Admin email", existingAdmin);
@@ -59,28 +58,19 @@ console.log("SECRET COde",process.env.ADMIN_SECRET_CODE);
 
 export const adminLogin = catchAsyncError(async (req, res, next) => {
   const { email, password } = req.body;
-console.log("login body", req.body);
 
   if (!email || !password) {
     return next(new ErrorHandler("Please provide email and password", 400));
   }
-
   const admin = await Admin.findOne({ email }).select("+password");
-  console.log("lodin Admin", admin);
-  
 
   if (!admin) {
     return next(new ErrorHandler("Invalid email or password", 401));
   }
-
   const isMatch = await admin.comparePassword(password);
-  console.log("MATCH", isMatch);
-  
-
   if (!isMatch) {
     return next(new ErrorHandler("Invalid email or password", 401));
   }
-
   sendToken(admin, 200, res, "Admin logged in successfully");
 });
 

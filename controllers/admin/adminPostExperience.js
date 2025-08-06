@@ -20,11 +20,6 @@ export const createExperienceAdmin = catchAsyncError(async (req, res, next) => {
         tips
     } = req.body;
 
-    // 🔒 Check if admin is logged in
-    if (!req.admin) {
-        return res.status(401).json({ message: "Unauthorized: Admin only" });
-    }
-
     // ✅ Validate required fields
     const missingFields = [];
     if (!category) missingFields.push("category");
