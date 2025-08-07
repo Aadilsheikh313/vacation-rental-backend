@@ -5,6 +5,30 @@ import streamifier from "streamifier";
 import { getCoordinatesFromLocation } from "../../config/mapApi.js";
 import { Experience } from "../../models/ExperienceCategory.js";
 
+// ✅ Only get approved posts – for frontend user guest side show
+export const getApprovedPostAdmin = catchAsyncError(async (req, res, next) => {
+    const approvedPosts = await Experience.find({ isApproved: true }).sort({ postedOn: -1 });
+
+    res.status(200).json({
+        success: true,
+        approvedPosts,
+    });
+});
+
+// ✅ This is fine for admin – all posts
+export const getAllPostByAdmin = catchAsyncError(async (req, res, next) => {
+       const filter = req.query.approved ? { isApproved: req.query.approved === "true" } : {};
+    const totalPosts = await Experience.countDocuments(filter);
+    const adminPosts = await Experience.find().sort({ postedOn: -1 });
+
+    res.status(200).json({
+        success: true,
+        adminPosts,
+        totalPosts,
+    });
+});
+
+
 // POST: Admin creating an experience
 export const createExperienceAdmin = catchAsyncError(async (req, res, next) => {
     const {
