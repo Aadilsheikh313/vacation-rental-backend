@@ -117,15 +117,16 @@ export const createExperienceAdmin = catchAsyncError(async (req, res, next) => {
 });
 
 export const getSinglePostAdmin = catchAsyncError(async (req, res, next) => {
-    const { id } = req.params.id;
+    const PostId = req.params.id;
+    console.log("POST ID", PostId);
 
-    const adminPost = await Experience.findById(id)
+    const adminPost = await Experience.findById(PostId)
         .populate("postedBy", "name email phone");
 
     if (!adminPost) {
         return next(new ErrorHandler("Admin single post not found", 404));
     }
- res.status(200).json({
+    res.status(200).json({
         success: true,
         message: "Admin single post successfully fetched",
         adminPost,
