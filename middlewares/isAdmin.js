@@ -1,7 +1,9 @@
 import ErrorHandler from "./errorMiddleware.js";
 
 export const isAdmin = (req, res, next) => {
-  if (req.user.role !== "admin") {
+  const role = req.user?.role || req.admin?.role;
+
+  if (role !== "admin") {
     return next(new ErrorHandler("Access denied! Admins only.", 403));
   }
   next();

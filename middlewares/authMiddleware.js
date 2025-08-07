@@ -18,16 +18,27 @@ export const isAuthorized = catchAsyncError(async (req, res, next) => {
   }
 
   const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
-
+  console.log("🔐 Decoded Token:", decoded);
   let user = await User.findById(decoded.id || decoded._id); // ✅ Safe
 
   // ❌ If not found in User, try Admin model
   if (!user) {
+    console.log("👤 Not a user, trying admin...");
     user = await Admin.findById(decoded.id || decoded._id);
     if (!user) {
+      console.log("❌ Neither user nor admin found!");
       return next(new ErrorHandler("User not found", 404));
     }
+
+    // ✅ If it's an admin
+    req.admin = user;
+    req.admin.role = "admin";
+  } else {
+    // ✅ If it's a regular user
+    req.user = user;
+    req.user.role = "user";
   }
+
 
   if (user.isBanned) {
     return next(new ErrorHandler("Your account has been banned.", 403));

@@ -6,6 +6,6 @@ import { createExperienceAdmin } from "../../controllers/admin/adminPostExperien
 
 const router = express.Router();
 
-router.post("/admin/postExperience", isAuthorized, isAdmin, upload.single("image"), createExperienceAdmin);
+router.post("/admin/postExperience",upload.single("image"), isAuthorized, isAdmin,  createExperienceAdmin);
 
 export default router;
