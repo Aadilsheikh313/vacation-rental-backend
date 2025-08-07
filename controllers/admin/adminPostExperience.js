@@ -17,7 +17,7 @@ export const getApprovedPostAdmin = catchAsyncError(async (req, res, next) => {
 
 // ✅ This is fine for admin – all posts
 export const getAllPostByAdmin = catchAsyncError(async (req, res, next) => {
-       const filter = req.query.approved ? { isApproved: req.query.approved === "true" } : {};
+    const filter = req.query.approved ? { isApproved: req.query.approved === "true" } : {};
     const totalPosts = await Experience.countDocuments(filter);
     const adminPosts = await Experience.find().sort({ postedOn: -1 });
 
@@ -115,3 +115,20 @@ export const createExperienceAdmin = catchAsyncError(async (req, res, next) => {
         adminposts: newExperience
     });
 });
+
+export const getSinglePostAdmin = catchAsyncError(async (req, res, next) => {
+    const { id } = req.params.id;
+
+    const adminPost = await Experience.findById(id)
+        .populate("postedBy", "name email phone");
+
+    if (!adminPost) {
+        return next(new ErrorHandler("Admin single post not found", 404));
+    }
+ res.status(200).json({
+        success: true,
+        message: "Admin single post successfully fetched",
+        adminPost,
+    });
+
+})
