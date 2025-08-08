@@ -118,7 +118,6 @@ export const createExperienceAdmin = catchAsyncError(async (req, res, next) => {
 
 export const getSinglePostAdmin = catchAsyncError(async (req, res, next) => {
     const PostId = req.params.id;
-    console.log("POST ID", PostId);
 
     const adminPost = await Experience.findById(PostId)
         .populate("postedBy", "name email phone");
@@ -133,3 +132,79 @@ export const getSinglePostAdmin = catchAsyncError(async (req, res, next) => {
     });
 
 })
+
+
+//Edit a Post user
+export const AdminEditPost = catchAsyncError(async (req, res, next) => {
+    const EditPostId = req.params.id;
+    const adminId = req.admin._id;
+
+    const Post = await Experience.findById(EditPostId);
+    if (!Post) return next(new ErrorHandler("Admin Post is not Found", 404));
+
+    if (Post.postedBy.toString() !== adminId.toString()) {
+        return next(new ErrorHandler("Unauthorized to edit this Post", 403));
+    }
+
+    const updatedFields = {
+        title: req.body.title || Post.title,
+        description: req.body.description || Post.description,
+        subcategory: req.body.subcategory || Post.subcategory,
+        category: req.body.category || Post.category,
+        country: req.body.country || Post.country,
+        city: req.body.city || Post.city,
+        location: req.body.location || Post.location,
+        bestTimeToVisit: req.body.bestTimeToVisit || Post.bestTimeToVisit,
+        history: req.body.history || Post.history,
+        tips: req.body.tips || Post.tips,
+        isApproved: req.body.isApproved !== undefined ? req.body.isApproved : Post.isApproved,
+    };
+
+    // Agar location change hui hai to coordinates update karo
+    if (req.body.location && req.body.location !== Post.location) {
+        const { lng, lat } = await getCoordinatesFromLocation(req.body.location);
+        updatedFields.coordinates = {
+            type: "Point",
+            coordinates: [lng, lat]
+        };
+    }
+
+    // Agar new image upload hui hai
+    if (req.file) {
+        // Purani image delete karo
+        if (Post.images?.length > 0 && Post.images[0].public_id) {
+            await cloudinary.uploader.destroy(Post.images[0].public_id);
+        }
+
+        // Nayi image upload
+        const streamUpload = (buffer) => {
+            return new Promise((resolve, reject) => {
+                const stream = cloudinary.uploader.upload_stream(
+                    { folder: "Post_images" },
+                    (error, result) => {
+                        if (result) resolve(result);
+                        else reject(error);
+                    }
+                );
+                streamifier.createReadStream(buffer).pipe(stream);
+            });
+        };
+
+        const result = await streamUpload(req.file.buffer);
+        updatedFields.images = [{
+            public_id: result.public_id,
+            url: result.secure_url,
+        }];
+    }
+
+    const updatedPostAdmin = await Experience.findByIdAndUpdate(EditPostId, updatedFields, {
+        new: true,
+        runValidators: true,
+    });
+
+    res.status(200).json({
+        success: true,
+        message: "Post updated successfully!",
+        Post: updatedPostAdmin,
+    });
+});
