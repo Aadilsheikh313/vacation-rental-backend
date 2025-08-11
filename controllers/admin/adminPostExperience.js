@@ -172,15 +172,16 @@ export const AdminEditPost = catchAsyncError(async (req, res, next) => {
     // Agar new image upload hui hai
     if (req.file) {
         // Purani image delete karo
-        if (Post.images?.length > 0 && Post.images[0].public_id) {
+        if (Post.images?.[0]?.public_id) {
             await cloudinary.uploader.destroy(Post.images[0].public_id);
         }
+
 
         // Nayi image upload
         const streamUpload = (buffer) => {
             return new Promise((resolve, reject) => {
                 const stream = cloudinary.uploader.upload_stream(
-                    { folder: "Post_images" },
+                    { folder: "experience_images" },
                     (error, result) => {
                         if (result) resolve(result);
                         else reject(error);
@@ -208,3 +209,32 @@ export const AdminEditPost = catchAsyncError(async (req, res, next) => {
         Post: updatedPostAdmin,
     });
 });
+
+
+//Approvied Property (Only Admin Post id ReApproved Post)
+
+export const reApprovedPostAdmin = catchAsyncError(async (req, res, next) => {
+    const PostId = req.params.id;
+    const adminId = req.admin._id;
+
+    const Post = await Experience.findById(PostId);
+
+    if (!Post) {
+        return next(new ErrorHandler("Admin Post not foun", 404));
+    }
+    if (Post.postedBy.toString() !== adminId.toString()) {
+        return next(new ErrorHandler("Unauthorized to REApproved  this Post", 403));
+    }
+
+    if (!Post.isApproved) {
+        return next(new ErrorHandler("Post is already Approved!", 400));
+    }
+    Post.isApproved = false;
+    await Post.save();
+    res.status(200).json({
+        success: true,
+        message: "Post is Approved successfully!",
+        Post,
+    })
+
+})

@@ -2,10 +2,12 @@ import express from "express";
 import { isAuthorized } from "../../middlewares/authMiddleware.js";
 import { isAdmin } from "../../middlewares/isAdmin.js";
 import { upload } from "../../middlewares/uploadMiddleware.js";
-import { AdminEditPost, createExperienceAdmin, 
-    getAllPostByAdmin, 
-    getApprovedPostAdmin, 
-    getSinglePostAdmin
+import {
+    AdminEditPost, createExperienceAdmin,
+    getAllPostByAdmin,
+    getApprovedPostAdmin,
+    getSinglePostAdmin,
+    reApprovedPostAdmin
 
 } from "../../controllers/admin/adminPostExperience.js";
 
@@ -15,6 +17,7 @@ router.get("/user-getallPosts", getApprovedPostAdmin);
 router.get("/admin-getAllPosts", getAllPostByAdmin);
 router.get("/admin/:id", getSinglePostAdmin);
 router.put("/admin/adminedit/:id", isAuthorized, isAdmin, upload.single("image"), AdminEditPost);
+router.put("/admin/approved/:id", isAuthorized, isAdmin, reApprovedPostAdmin);
 router.post("/admin/postExperience", isAuthorized, isAdmin, upload.single("image"), createExperienceAdmin);
 
 export default router;
