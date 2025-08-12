@@ -4,6 +4,9 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { connectDB } from "./config/db.js";
 
+import tripRoutes from './routes/tripRoutes.js';
+import overpassRoutes from "./routes/overpassRoutes.js";
+
 import { errorMiddleware } from "./middlewares/errorMiddleware.js";
 import { updateActivity } from './middlewares/updateLastActive.js';
 
@@ -44,6 +47,9 @@ app.use(cors({
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use('/api/mytrip', tripRoutes);
+app.use("/api/overpass", overpassRoutes);
 
 
 app.use('/api/auth', authRoutes);

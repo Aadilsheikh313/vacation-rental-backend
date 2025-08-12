@@ -80,13 +80,13 @@ export const logout = catchAsyncError(async (req, res, next) => {
 export const getUser = catchAsyncError(async (req, res, next) => {
     const userId = req.user._id; // JWT se mila ID
 
-    const user = await User.findById(userId).select("-password"); // password hide
+    const user = await User.findById(userId).select("-password"); 
     if (!user) {
         return next(new ErrorHandler("User not found!", 404));
     }
 
     res.status(200).json({
         success: true,
-        user, 
+        user,
     });
 });
