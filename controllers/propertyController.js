@@ -206,7 +206,7 @@ export const softDeleteProperty = catchAsyncError(async (req, res, next) => {
 //hard Delete property Controller 
 export const hardDeleteProperty = catchAsyncError(async (req, res, next) => {
     const deletePropertyId = req.params.id;
-    const userId = req.user._id; //authMiddelwera
+    const userId = req.user._id;
 
     const property = await Property.findById(deletePropertyId);
     if (!property) {
@@ -224,10 +224,6 @@ export const hardDeleteProperty = catchAsyncError(async (req, res, next) => {
 
     //  hard delete Remove from DB
     await Property.findByIdAndDelete(deletePropertyId);
-    // Instead of deleting the record
-    //   property.isHardDeleted = true;
-    //   await property.save();
-
     res.status(200).json({
         success: true,
         message: "Property marked as expired (soft deleted) successfully!",
@@ -259,21 +255,31 @@ export const reactiveProperty = catchAsyncError(async (req, res, next) => {
     });
 })
 
-//Host get all Property only Host posted post 
+// Host get all properties only host's own posts
 export const getMyProperties = catchAsyncError(async (req, res, next) => {
     const userId = req.user?._id;
-    if (!userId) {
-        return next(new ErrorHandler("Unauthorized access", 401));
-    }
+    // if (!userId) {
+    //     return next(new ErrorHandler("Unauthorized access", 401));
+    // }
 
+    // Sirf current host ki properties fetch karo
     const properties = await Property.find({ userId }).lean();
+
+    // Agar property empty hai
+    if (!properties || properties.length === 0) {
+        return res.status(200).json({
+            success: true,
+            count: 0,
+            message: "You are not post any kind of properties",
+            properties: []
+        });
+    }
 
     res.status(200).json({
         success: true,
         count: properties.length,
         properties,
     });
-
 });
 
 //get host only expired property Owner Only

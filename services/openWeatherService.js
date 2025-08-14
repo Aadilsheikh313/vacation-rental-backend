@@ -4,7 +4,6 @@ import { getCache, setCache } from '../utils/cache.js';
 
 export async function getForecast(lat, lon) {
   const KEY = process.env.OPENWEATHER_KEY;
-  console.log("OPEN WEATHER", KEY);
   const key = `weather:${lat}:${lon}`;
   const cached = getCache(key);
   if (cached) return cached;

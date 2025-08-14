@@ -6,6 +6,7 @@ import { connectDB } from "./config/db.js";
 
 import tripRoutes from './routes/tripRoutes.js';
 import overpassRoutes from "./routes/overpassRoutes.js";
+import foodRoutes from './routes/foodRoutes.js';
 
 import { errorMiddleware } from "./middlewares/errorMiddleware.js";
 import { updateActivity } from './middlewares/updateLastActive.js';
@@ -50,7 +51,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use('/api/mytrip', tripRoutes);
 app.use("/api/overpass", overpassRoutes);
-
+app.use('/api/food', foodRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/property', propertyRoutes);
