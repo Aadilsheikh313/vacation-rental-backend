@@ -8,57 +8,70 @@ export const globalSearch = async (req, res) => {
   try {
     const { query, minPrice, maxPrice, city, role } = req.query;
 
-    // 🔍 Build search conditions dynamically
-    const regexQuery = query ? { $regex: query, $options: "i" } : {};
+    // ✅ Build regex safely
+    const regexQuery = query && typeof query === "string"
+      ? { $regex: query, $options: "i" }
+      : null;
 
-    // Users search
-    const users = await User.find({
-      $or: [
+    // ---------- Users ----------
+    let userFilter = {};
+    if (regexQuery) {
+      userFilter.$or = [
         { name: regexQuery },
         { email: regexQuery },
-        { phone: regexQuery }
-      ],
-      ...(role ? { role } : {}) // optional filter by role (guest/host)
-    }).select("name email phone role");
+        { phone: regexQuery },
+      ];
+    }
+    if (role) userFilter.role = role;
 
-    // Properties search
-    const properties = await Property.find({
-      $or: [
+    const users = await User.find(userFilter).select("name email phone role");
+
+    // ---------- Properties ----------
+    let propertyFilter = {};
+    if (regexQuery) {
+      propertyFilter.$or = [
         { title: regexQuery },
         { description: regexQuery },
         { city: regexQuery },
         { country: regexQuery },
-        { location: regexQuery }
-      ],
-      ...(minPrice || maxPrice
-        ? {
-            price: {
-              ...(minPrice ? { $gte: minPrice } : {}),
-              ...(maxPrice ? { $lte: maxPrice } : {}),
-            },
-          }
-        : {}),
-      ...(city ? { city: { $regex: city, $options: "i" } } : {}),
-    }).populate("userId", "name email");
+        { location: regexQuery },
+      ];
+    }
+    if (minPrice || maxPrice) {
+      propertyFilter.price = {
+        ...(minPrice ? { $gte: Number(minPrice) } : {}),
+        ...(maxPrice ? { $lte: Number(maxPrice) } : {}),
+      };
+    }
+    if (city) {
+      propertyFilter.city = { $regex: city, $options: "i" };
+    }
 
-    // Experiences search
-    const experiences = await Experience.find({
-      $or: [
+    const properties = await Property.find(propertyFilter).populate(
+      "userId",
+      "name email"
+    );
+
+    // ---------- Experiences ----------
+    let experienceFilter = {};
+    if (regexQuery) {
+      experienceFilter.$or = [
         { title: regexQuery },
         { description: regexQuery },
         { location: regexQuery },
         { city: regexQuery },
-        { country: regexQuery }
-      ]
-    });
+        { country: regexQuery },
+      ];
+    }
 
-    // Bookings search
-    const bookings = await Booking.find({
-      ...(query ? {} : {}), // could extend with propertyId/userId lookups
-    })
+    const experiences = await Experience.find(experienceFilter);
+
+    // ---------- Bookings ----------
+    const bookings = await Booking.find({})
       .populate("user", "name email")
       .populate("property", "title city country");
 
+    // ---------- Response ----------
     res.json({
       success: true,
       data: {
@@ -69,6 +82,7 @@ export const globalSearch = async (req, res) => {
       },
     });
   } catch (err) {
+    console.error("❌ Global Search Error:", err.message);
     res.status(500).json({ success: false, message: err.message });
   }
 };
