@@ -90,6 +90,7 @@ export const postProperty = catchAsyncError(async (req, res, next) => {
         userId: req.user._id, // From authenticated user (set in auth middleware)
     });
 
+    await newproperty.save();
     // Success response
     res.status(201).json({
         success: true,
@@ -258,9 +259,6 @@ export const reactiveProperty = catchAsyncError(async (req, res, next) => {
 // Host get all properties only host's own posts
 export const getMyProperties = catchAsyncError(async (req, res, next) => {
     const userId = req.user?._id;
-    // if (!userId) {
-    //     return next(new ErrorHandler("Unauthorized access", 401));
-    // }
 
     // Sirf current host ki properties fetch karo
     const properties = await Property.find({ userId }).lean();

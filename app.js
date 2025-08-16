@@ -19,6 +19,7 @@ import bookingRoutes from "./routes/bookingRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import invoiceRoutes from "./routes/invoiceRoutes.js";
 import geocodeRouter from "./routes/geocode.js";
+import globalSearchRoutes from "./routes/globalSearchRoutes.js";
 import adminRoutes from "./routes/adminroutes/adimauthRoutes.js";
 import adminHomeDashRoutes from "./routes/adminroutes/adminHomeDashRoutes.js";
 import adminDashboardRoutes from "./routes/adminroutes/adminDashboardRoutes.js";
@@ -27,6 +28,7 @@ import adminGuestRoutes from "./routes/adminroutes/adminGuestRoutes.js";
 import adminBannedRoutes from "./routes/adminroutes/adminBannedUserRoutes.js";
 import adminPropertyRoutes from "./routes/adminroutes/activePropertyRoutes.js";
 import adminPostRoutes from "./routes/adminroutes/adminPostExperienceRoutes.js";
+
 
 const app = express();
 dotenv.config();
@@ -60,6 +62,7 @@ app.use('/api/booking', bookingRoutes);
 app.use('/api/invoice', invoiceRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api', geocodeRouter);
+app.use("/api/search", globalSearchRoutes);
 app.use('/api/v1', adminRoutes);
 app.use('/api/v1', adminHomeDashRoutes);
 app.use('/api/v1', adminDashboardRoutes);
@@ -68,6 +71,7 @@ app.use('/api/v1', adminGuestRoutes);
 app.use('/api/banned', adminBannedRoutes);
 app.use("/api/active/inactive", adminPropertyRoutes);
 app.use("/api/adminpost", adminPostRoutes);
+
 app.get("/api/v1/test", (req, res) => {
   res.status(200).json({
     success: true,

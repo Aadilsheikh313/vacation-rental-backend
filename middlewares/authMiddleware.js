@@ -8,44 +8,39 @@ import { Admin } from "../models/admin.js";
 export const isAuthorized = catchAsyncError(async (req, res, next) => {
   let token = req.cookies.token;
 
-  // fallback: Authorization header
-  if (!token && req.headers.authorization?.startsWith("Bearer")) {
+  if (!token && req.headers.authorization?.startsWith("Bearer ")) {
     token = req.headers.authorization.split(" ")[1];
   }
 
   if (!token) {
-    return next(new ErrorHandler("User not authorized", 400));
+    return next(new ErrorHandler("No token provided", 401));
   }
 
-  const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+  } catch (err) {
+    return next(new ErrorHandler("Invalid or expired token", 403));
+  }
+
   console.log("🔐 Decoded Token:", decoded);
-  let user = await User.findById(decoded.id || decoded._id); // ✅ Safe
 
-  // ❌ If not found in User, try Admin model
-  if (!user) {
-    console.log("👤 Not a user, trying admin...");
-    user = await Admin.findById(decoded.id || decoded._id);
-    if (!user) {
-      console.log("❌ Neither user nor admin found!");
-      return next(new ErrorHandler("User not found", 404));
+  let user = await User.findById(decoded.id);
+  if (user) {
+    if (user.isBanned) {
+      return next(new ErrorHandler("Your account has been banned.", 403));
     }
-
-    // ✅ If it's an admin
-    req.admin = user;
-    req.admin.role = "admin";
-  } else {
-    // ✅ If it's a regular user
     req.user = user;
-    req.user.role = "user";
+    req.user.role = decoded.role || "user";
+    return next();
   }
 
-
-  if (user.isBanned) {
-    return next(new ErrorHandler("Your account has been banned.", 403));
+  let admin = await Admin.findById(decoded.id);
+  if (admin) {
+    req.admin = admin;
+    req.admin.role = decoded.role || "admin";
+    return next();
   }
 
-  req.user = user;
-  req.user.role = decoded.role;
-  next();
-
+  return next(new ErrorHandler("User not found", 404));
 });
