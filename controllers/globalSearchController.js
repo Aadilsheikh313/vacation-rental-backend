@@ -1,88 +1,53 @@
-// controllers/globalSearchController.js
 import { User } from "../models/User.js";
 import { Property } from "../models/Property.js";
-import { Experience } from "../models/ExperienceCategory.js";
-import { Booking } from "../models/Booking.js";
 
-export const globalSearch = async (req, res) => {
+// General search (for Admin)
+export const adminSearch = async (req, res) => {
   try {
-    const { query, minPrice, maxPrice, city, role } = req.query;
+    const { query } = req.query;
 
-    // ✅ Build regex safely
-    const regexQuery = query && typeof query === "string"
-      ? { $regex: query, $options: "i" }
-      : null;
+    const users = await User.find({
+      name: { $regex: query, $options: "i" },
+    }).limit(10);
 
-    // ---------- Users ----------
-    let userFilter = {};
-    if (regexQuery) {
-      userFilter.$or = [
-        { name: regexQuery },
-        { email: regexQuery },
-        { phone: regexQuery },
-      ];
-    }
-    if (role) userFilter.role = role;
+    const properties = await Property.find({
+      title: { $regex: query, $options: "i" },
+    }).limit(10);
 
-    const users = await User.find(userFilter).select("name email phone role");
-
-    // ---------- Properties ----------
-    let propertyFilter = {};
-    if (regexQuery) {
-      propertyFilter.$or = [
-        { title: regexQuery },
-        { description: regexQuery },
-        { city: regexQuery },
-        { country: regexQuery },
-        { location: regexQuery },
-      ];
-    }
-    if (minPrice || maxPrice) {
-      propertyFilter.price = {
-        ...(minPrice ? { $gte: Number(minPrice) } : {}),
-        ...(maxPrice ? { $lte: Number(maxPrice) } : {}),
-      };
-    }
-    if (city) {
-      propertyFilter.city = { $regex: city, $options: "i" };
-    }
-
-    const properties = await Property.find(propertyFilter).populate(
-      "userId",
-      "name email"
-    );
-
-    // ---------- Experiences ----------
-    let experienceFilter = {};
-    if (regexQuery) {
-      experienceFilter.$or = [
-        { title: regexQuery },
-        { description: regexQuery },
-        { location: regexQuery },
-        { city: regexQuery },
-        { country: regexQuery },
-      ];
-    }
-
-    const experiences = await Experience.find(experienceFilter);
-
-    // ---------- Bookings ----------
-    const bookings = await Booking.find({})
-      .populate("user", "name email")
-      .populate("property", "title city country");
-
-    // ---------- Response ----------
-    res.json({
-      success: true,
-      data: {
-        users,
-        properties,
-        experiences,
-        bookings,
-      },
-    });
+    res.json({ users, properties });
   } catch (err) {
-    console.error("❌ Global Search Error:", err.message);
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Guest page search
+export const guestSearch = async (req, res) => {
+  try {
+    const { query } = req.query;
+
+    const properties = await Property.find({
+      city: { $regex: query, $options: "i" },
+    }).limit(10);
+
+    res.json({ properties });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Host page search (own properties only)
+export const hostSearch = async (req, res) => {
+  try {
+    const { query } = req.query;
+    const hostId = req.user.id; // assume JWT se userId aa raha hai
+
+    const properties = await Property.find({
+      userId: hostId,
+      title: { $regex: query, $options: "i" },
+    }).limit(10);
+
+    res.json({ properties });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 };
