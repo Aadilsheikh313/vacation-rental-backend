@@ -33,24 +33,34 @@ import adminPostRoutes from "./routes/adminroutes/adminPostExperienceRoutes.js";
 const app = express();
 dotenv.config();
 
-const allowedOrigins = process.env.FRONTEND_URL.split(",");
+// ✅ Allowed origins cleanup
+const allowedOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(",").map(o => o.trim().replace(/\/$/, ""))
+  : ["http://localhost:5173"];
 
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin?.replace(/\/$/, ""))) {
       callback(null, true);
     } else {
-      callback(new Error("❌ Not allowed by CORS: " + origin));
+      console.error("❌ CORS blocked:", origin);
+      callback(null, false); // <-- don’t crash, just reject
     }
   },
   credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
 }));
 
 
+// ✅ Parsers
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ✅ Custom middleware BEFORE routes
+app.use(updateActivity);
+
+// ✅ Routes
 app.use('/api/mytrip', tripRoutes);
 app.use("/api/overpass", overpassRoutes);
 app.use('/api/food', foodRoutes);
@@ -72,6 +82,7 @@ app.use('/api/banned', adminBannedRoutes);
 app.use("/api/active/inactive", adminPropertyRoutes);
 app.use("/api/adminpost", adminPostRoutes);
 
+// ✅ Test route
 app.get("/api/v1/test", (req, res) => {
   res.status(200).json({
     success: true,
@@ -79,11 +90,12 @@ app.get("/api/v1/test", (req, res) => {
   });
 });
 
-
+// ✅ Connect DB
 connectDB();
 
+// ✅ Error middleware ALWAYS last
 app.use(errorMiddleware);
-app.use(updateActivity);
+
 
 export default app;
 
