@@ -126,7 +126,7 @@ const propertySchema = new mongoose.Schema({
 
   privacy: {
     type: String,
-    enum: ["Private", "Shared"],
+    enum: ["Private", "Shared", "NoBalcony"],
     default: "Private",
   },
 

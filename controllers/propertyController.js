@@ -30,47 +30,56 @@ export const postProperty = catchAsyncError(async (req, res, next) => {
         country,
         city,
         location,
+        maxGuests,
+        roomSize,
+        facilities,
+        views,
+        privacy,
+        workspace,
+        directContact,
+        bedType,
     } = req.body;
 
-
-    // Validate required fields
-    if (!title || !description || !price || !category || !country || !city || !location) {
+    // ✅ Validate required fields
+    if (!title || !description || !price || !category || !country || !city || !location || !maxGuests || !bedType) {
         return next(new ErrorHandler("Please fill out all required property details!", 400));
     }
 
-    // Validate price is a positive number
+    // ✅ Validate price
     if (isNaN(price) || Number(price) <= 0) {
         return next(new ErrorHandler("Please enter a valid price greater than 0.", 400));
     }
 
-    // Check if image file is uploaded
+    // ✅ Validate maxGuests
+    if (isNaN(maxGuests) || Number(maxGuests) < 1 || Number(maxGuests) > 8) {
+        return next(new ErrorHandler("Guests must be between 1 and 8!", 400));
+    }
+
+    // ✅ Image validation
     if (!req.file) {
         return next(new ErrorHandler("Image is required. Please upload a property image.", 400));
     }
 
-    // Function to upload image buffer to Cloudinary
+    // 🔹 Upload image to Cloudinary
     const streamUpload = (buffer) => {
         return new Promise((resolve, reject) => {
             const stream = cloudinary.uploader.upload_stream(
                 { folder: "property_images" },
                 (error, result) => {
-                    if (result) {
-                        resolve(result);
-                    } else {
-                        reject(error);
-                    }
+                    if (result) resolve(result);
+                    else reject(error);
                 }
             );
             streamifier.createReadStream(buffer).pipe(stream);
         });
     };
 
-    // Upload image to Cloudinary
     const result = await streamUpload(req.file.buffer);
 
+    // 🔹 Convert location → coordinates
     const { lng, lat } = await getCoordinatesFromLocation(location);
 
-    // Create and save property in database
+    // 🔹 Create property object
     const newproperty = await Property.create({
         title,
         description,
@@ -87,11 +96,22 @@ export const postProperty = catchAsyncError(async (req, res, next) => {
             type: "Point",
             coordinates: [lng, lat],
         },
-        userId: req.user._id, // From authenticated user (set in auth middleware)
+        maxGuests,
+        roomSize: roomSize ? {
+            value: roomSize.value,
+            unit: roomSize.unit || "m²"
+        } : undefined,
+        facilities: facilities || [],
+        views: views || [],
+        privacy: privacy || "Private",
+        workspace: workspace || false,
+        directContact: directContact || {},
+        bedType,
+        userId: req.user._id, // From authenticated user (auth middleware)
     });
 
     await newproperty.save();
-    // Success response
+
     res.status(201).json({
         success: true,
         message: "Property posted successfully.",
