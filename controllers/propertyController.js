@@ -22,6 +22,18 @@ export const getAllPropertyPosted = catchAsyncError(async (req, res, next) => {
  * POST a new property listing
  */
 export const postProperty = catchAsyncError(async (req, res, next) => {
+     let { facilities, views, directContact } = req.body;
+
+  // Handle JSON string → array conversion
+  if (typeof facilities === "string") {
+    try { facilities = JSON.parse(facilities); } catch { facilities = []; }
+  }
+  if (typeof views === "string") {
+    try { views = JSON.parse(views); } catch { views = []; }
+  }
+  if (typeof directContact === "string") {
+    try { directContact = JSON.parse(directContact); } catch { directContact = {}; }
+  }
     const {
         title,
         description,
@@ -32,11 +44,8 @@ export const postProperty = catchAsyncError(async (req, res, next) => {
         location,
         maxGuests,
         roomSize,
-        facilities,
-        views,
         privacy,
         workspace,
-        directContact,
         bedType,
     } = req.body;
 
