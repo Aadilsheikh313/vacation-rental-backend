@@ -28,6 +28,7 @@ import adminGuestRoutes from "./routes/adminroutes/adminGuestRoutes.js";
 import adminBannedRoutes from "./routes/adminroutes/adminBannedUserRoutes.js";
 import adminPropertyRoutes from "./routes/adminroutes/activePropertyRoutes.js";
 import adminPostRoutes from "./routes/adminroutes/adminPostExperienceRoutes.js";
+import amenityRoutes from "./routes/amenityRoutes.js";
 
 
 const app = express();
@@ -81,6 +82,8 @@ app.use('/api/v1', adminGuestRoutes);
 app.use('/api/banned', adminBannedRoutes);
 app.use("/api/active/inactive", adminPropertyRoutes);
 app.use("/api/adminpost", adminPostRoutes);
+app.use("/api/amenities", amenityRoutes);
+
 
 // ✅ Test route
 app.get("/api/v1/test", (req, res) => {
