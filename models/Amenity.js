@@ -2,8 +2,8 @@
 import mongoose from "mongoose";
 
 const amenitySchema = new mongoose.Schema({
-  propertyId: { type: mongoose.Schema.Types.ObjectId, ref: "Property", required: true },
 
+  propertyId: { type: mongoose.Schema.Types.ObjectId, ref: "Property", required: true ,index: true,},
   bedroomLiving: {
     kingBed: { type: Boolean, default: false },
     livingArea: { type: Boolean, default: false },

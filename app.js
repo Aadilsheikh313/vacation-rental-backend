@@ -29,6 +29,7 @@ import adminBannedRoutes from "./routes/adminroutes/adminBannedUserRoutes.js";
 import adminPropertyRoutes from "./routes/adminroutes/activePropertyRoutes.js";
 import adminPostRoutes from "./routes/adminroutes/adminPostExperienceRoutes.js";
 import amenityRoutes from "./routes/amenityRoutes.js";
+import policyRoutes from './routes/policyRoutes.js';
 
 
 const app = express();
@@ -83,6 +84,7 @@ app.use('/api/banned', adminBannedRoutes);
 app.use("/api/active/inactive", adminPropertyRoutes);
 app.use("/api/adminpost", adminPostRoutes);
 app.use("/api/amenities", amenityRoutes);
+app.use("/api/polices",policyRoutes);
 
 
 // ✅ Test route
