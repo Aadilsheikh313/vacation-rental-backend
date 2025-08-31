@@ -16,8 +16,6 @@ export const getAllReviewsForProperty = catchAsyncError(async (req, res) => {
 
 
 export const postReview = catchAsyncError(async (req, res, next) => {
-  console.log("🔔 Received review:", req.body, req.params, req.user);
-
   const { rating, comment } = req.body;
   const { propertyId } = req.params;
 
