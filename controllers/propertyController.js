@@ -3,365 +3,370 @@ import ErrorHandler from "../middlewares/errorMiddleware.js";
 import { Property } from "../models/Property.js";
 import streamifier from "streamifier";
 import cloudinary from "../config/cloudinary.js";
-import axios from "axios";
 import { getCoordinatesFromLocation } from "../config/mapApi.js";
 
-/**
- * GET all properties that are not expired
- */
-export const getAllPropertyPosted = catchAsyncError(async (req, res, next) => {
-    const property = await Property.find({ expired: false });
+/** ----------------- Helper Parsers ----------------- **/
+const parseArray = (data) => {
+  if (!data) return [];
+  if (typeof data === "string") {
+    try {
+      return JSON.parse(data);
+    } catch {
+      return data.split(",").map((item) => item.trim());
+    }
+  }
+  return Array.isArray(data) ? data : [];
+};
 
-    res.status(200).json({
-        success: true,
-        property,
-    });
+const parseObject = (data) => {
+  if (!data) return {};
+  if (typeof data === "string") {
+    try {
+      return JSON.parse(data);
+    } catch {
+      return {};
+    }
+  }
+  return typeof data === "object" ? data : {};
+};
+
+const parseRoomSize = (data) => {
+  if (!data) return undefined;
+  if (typeof data === "string") {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      return undefined;
+    }
+  }
+  if (typeof data === "object") {
+    return {
+      value: Number(data.value) || 0,
+      unit: data.unit || "m²",
+    };
+  }
+  return undefined;
+};
+
+/** ----------------- Get All Non-Expired ----------------- **/
+export const getAllPropertyPosted = catchAsyncError(async (req, res, next) => {
+  const property = await Property.find({ expired: false });
+
+  res.status(200).json({
+    success: true,
+    property,
+  });
 });
 
-/**
- * POST a new property listing
- */
+/** ----------------- Post New Property ----------------- **/
 export const postProperty = catchAsyncError(async (req, res, next) => {
-     let { facilities, views, directContact } = req.body;
+  let {
+    title,
+    description,
+    price,
+    category,
+    country,
+    city,
+    location,
+    maxGuests,
+    roomSize,
+    privacy,
+    workspace,
+    bedType,
+    facilities,
+    views,
+    directContact,
+  } = req.body;
 
-  // Handle JSON string → array conversion
-  if (typeof facilities === "string") {
-    try { facilities = JSON.parse(facilities); } catch { facilities = []; }
+  /** ✅ Validate required fields */
+  if (!title || !description || !price || !category || !country || !city || !location || !maxGuests || !bedType) {
+    return next(new ErrorHandler("Please fill out all required property details!", 400));
   }
-  if (typeof views === "string") {
-    try { views = JSON.parse(views); } catch { views = []; }
+
+  if (isNaN(price) || Number(price) <= 0) {
+    return next(new ErrorHandler("Please enter a valid price greater than 0.", 400));
   }
-  if (typeof directContact === "string") {
-    try { directContact = JSON.parse(directContact); } catch { directContact = {}; }
+
+  if (isNaN(maxGuests) || Number(maxGuests) < 1 || Number(maxGuests) > 8) {
+    return next(new ErrorHandler("Guests must be between 1 and 8!", 400));
   }
-    const {
-        title,
-        description,
-        price,
-        category,
-        country,
-        city,
-        location,
-        maxGuests,
-        roomSize,
-        privacy,
-        workspace,
-        bedType,
-    } = req.body;
 
-    // ✅ Validate required fields
-    if (!title || !description || !price || !category || !country || !city || !location || !maxGuests || !bedType) {
-        return next(new ErrorHandler("Please fill out all required property details!", 400));
+  if (!req.file) {
+    return next(new ErrorHandler("Image is required. Please upload a property image.", 400));
+  }
+
+  /** ☁️ Upload to Cloudinary */
+  const streamUpload = (buffer) => {
+    return new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder: "property_images" },
+        (error, result) => {
+          if (result) resolve(result);
+          else reject(error);
+        }
+      );
+      streamifier.createReadStream(buffer).pipe(stream);
+    });
+  };
+  const result = await streamUpload(req.file.buffer);
+
+  /** 📍 Convert location → coordinates */
+  const { lng, lat } = await getCoordinatesFromLocation(location);
+
+  /** 🛠 Parse Special Fields */
+  facilities = parseArray(facilities);
+  views = parseArray(views);
+  directContact = parseObject(directContact);
+  roomSize = parseRoomSize(roomSize);
+
+  /** 🏠 Create Property */
+  const newProperty = await Property.create({
+    title,
+    description,
+    price,
+    category,
+    country,
+    city,
+    location,
+    image: {
+      public_id: result.public_id,
+      url: result.secure_url,
+    },
+    coordinates: {
+      type: "Point",
+      coordinates: [lng, lat],
+    },
+    maxGuests,
+    roomSize,
+    facilities,
+    views,
+    privacy: privacy || "Private",
+    workspace: workspace || false,
+    directContact,
+    bedType,
+    userId: req.user._id,
+  });
+
+  res.status(201).json({
+    success: true,
+    message: "Property posted successfully.",
+    newProperty,
+  });
+});
+
+/** ----------------- Get Single Property ----------------- **/
+export const getSingleProperty = catchAsyncError(async (req, res, next) => {
+  const propertyId = req.params.id;
+  const property = await Property.findById(propertyId).populate("userId", "name email phone");
+
+  if (!property) {
+    return next(new ErrorHandler("Property not found", 404));
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Property successfully fetched",
+    property,
+  });
+});
+
+/** ----------------- Edit Property ----------------- **/
+export const editProperty = catchAsyncError(async (req, res, next) => {
+  const editPropertyId = req.params.id;
+  const userId = req.user._id;
+
+  const property = await Property.findById(editPropertyId);
+  if (!property) return next(new ErrorHandler("Property not found", 404));
+
+  if (property.userId.toString() !== userId.toString()) {
+    return next(new ErrorHandler("Unauthorized to edit this property", 403));
+  }
+
+  const updatedFields = {
+    title: req.body.title || property.title,
+    description: req.body.description || property.description,
+    price: req.body.price || property.price,
+    category: req.body.category || property.category,
+    country: req.body.country || property.country,
+    city: req.body.city || property.city,
+    location: req.body.location || property.location,
+    expired: req.body.expired !== undefined ? req.body.expired : property.expired,
+  };
+
+  if (req.file) {
+    if (property.image?.public_id) {
+      await cloudinary.uploader.destroy(property.image.public_id);
     }
-
-    // ✅ Validate price
-    if (isNaN(price) || Number(price) <= 0) {
-        return next(new ErrorHandler("Please enter a valid price greater than 0.", 400));
-    }
-
-    // ✅ Validate maxGuests
-    if (isNaN(maxGuests) || Number(maxGuests) < 1 || Number(maxGuests) > 8) {
-        return next(new ErrorHandler("Guests must be between 1 and 8!", 400));
-    }
-
-    // ✅ Image validation
-    if (!req.file) {
-        return next(new ErrorHandler("Image is required. Please upload a property image.", 400));
-    }
-
-    // 🔹 Upload image to Cloudinary
-    const streamUpload = (buffer) => {
-        return new Promise((resolve, reject) => {
-            const stream = cloudinary.uploader.upload_stream(
-                { folder: "property_images" },
-                (error, result) => {
-                    if (result) resolve(result);
-                    else reject(error);
-                }
-            );
-            streamifier.createReadStream(buffer).pipe(stream);
-        });
-    };
+    const streamUpload = (buffer) =>
+      new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "property_images" },
+          (error, result) => (result ? resolve(result) : reject(error))
+        );
+        streamifier.createReadStream(buffer).pipe(stream);
+      });
 
     const result = await streamUpload(req.file.buffer);
-
-    // 🔹 Convert location → coordinates
-    const { lng, lat } = await getCoordinatesFromLocation(location);
-
-    // 🔹 Create property object
-    const newproperty = await Property.create({
-        title,
-        description,
-        price,
-        category,
-        country,
-        city,
-        location,
-        image: {
-            public_id: result.public_id,
-            url: result.secure_url,
-        },
-        coordinates: {
-            type: "Point",
-            coordinates: [lng, lat],
-        },
-        maxGuests,
-        roomSize: roomSize ? {
-            value: roomSize.value,
-            unit: roomSize.unit || "m²"
-        } : undefined,
-        facilities: facilities || [],
-        views: views || [],
-        privacy: privacy || "Private",
-        workspace: workspace || false,
-        directContact: directContact || {},
-        bedType,
-        userId: req.user._id, // From authenticated user (auth middleware)
-    });
-
-    await newproperty.save();
-
-    res.status(201).json({
-        success: true,
-        message: "Property posted successfully.",
-        newproperty,
-    });
-});
-
-
-//get a single Property 
-
-export const getSingleProperty = catchAsyncError(async (req, res, next) => {
-    const propertyId = req.params.id;
-
-    // 🔄 Populate user name and email from the User collection
-    const property = await Property.findById(propertyId).populate("userId", "name email phone");
-
-
-    if (!property) {
-        return next(new ErrorHandler("Property not found", 404));
-    }
-
-    res.status(200).json({
-        success: true,
-        message: "Property successfully fetched",
-        property,
-    });
-});
-
-
-// property edit function 
-export const editProperty = catchAsyncError(async (req, res, next) => {
-    const editPropertyId = req.params.id;
-    const userId = req.user._id; // authMiddleware
-
-    const property = await Property.findById(editPropertyId);
-    if (!property) return next(new ErrorHandler("Property not found", 404));
-
-    if (property.userId.toString() !== userId.toString()) {
-        return next(new ErrorHandler("Unauthorized to edit this property", 403));
-    }
-
-    const updatedFields = {
-        title: req.body.title || property.title,
-        description: req.body.description || property.description,
-        price: req.body.price || property.price,
-        category: req.body.category || property.category,
-        country: req.body.country || property.country,
-        city: req.body.city || property.city,
-        location: req.body.location || property.location,
-        expired: req.body.expired !== undefined ? req.body.expired : property.expired,
+    updatedFields.image = {
+      public_id: result.public_id,
+      url: result.secure_url,
     };
+  }
 
-    // If new image is uploaded
-    if (req.file) {
-        // Optional: delete old image from Cloudinary
-        if (property.image?.public_id) {
-            await cloudinary.uploader.destroy(property.image.public_id);
-        }
+  const updatedProperty = await Property.findByIdAndUpdate(editPropertyId, updatedFields, {
+    new: true,
+    runValidators: true,
+  });
 
-        const streamUpload = (buffer) => {
-            return new Promise((resolve, reject) => {
-                const stream = cloudinary.uploader.upload_stream(
-                    { folder: "property_images" },
-                    (error, result) => {
-                        if (result) resolve(result);
-                        else reject(error);
-                    }
-                );
-                streamifier.createReadStream(buffer).pipe(stream);
-            });
-        };
-
-        const result = await streamUpload(req.file.buffer);
-
-        updatedFields.image = {
-            public_id: result.public_id,
-            url: result.secure_url,
-        };
-    }
-
-    const updatedProperty = await Property.findByIdAndUpdate(editPropertyId, updatedFields, {
-        new: true,
-        runValidators: true,
-    });
-
-    res.status(200).json({
-        success: true,
-        message: "Property updated successfully!",
-        property: updatedProperty,
-    });
+  res.status(200).json({
+    success: true,
+    message: "Property updated successfully!",
+    property: updatedProperty,
+  });
 });
 
-// Soft Delete property Controller 
+/** ----------------- Soft Delete ----------------- **/
 export const softDeleteProperty = catchAsyncError(async (req, res, next) => {
-    const deletePropertyId = req.params.id;
-    const userId = req.user._id; //authMiddelwera
+  const deletePropertyId = req.params.id;
+  const userId = req.user._id;
 
-    const property = await Property.findById(deletePropertyId);
-    if (!property) return next(new ErrorHandler("Property not found!", 404));
+  const property = await Property.findById(deletePropertyId);
+  if (!property) return next(new ErrorHandler("Property not found!", 404));
 
-    if (property.userId.toString() !== userId.toString()) {
-        return next(new ErrorHandler("Unauthorized to soft delete this property", 403));
-    }
-    property.expired = true;
-    await property.save();
+  if (property.userId.toString() !== userId.toString()) {
+    return next(new ErrorHandler("Unauthorized to soft delete this property", 403));
+  }
 
-    res.status(200).json({
-        success: true,
-        message: "Property soft-deleted (expired) successfully!",
-    });
-})
+  property.expired = true;
+  await property.save();
 
-//hard Delete property Controller 
+  res.status(200).json({
+    success: true,
+    message: "Property soft-deleted (expired) successfully!",
+  });
+});
+
+/** ----------------- Hard Delete ----------------- **/
 export const hardDeleteProperty = catchAsyncError(async (req, res, next) => {
-    const deletePropertyId = req.params.id;
-    const userId = req.user._id;
+  const deletePropertyId = req.params.id;
+  const userId = req.user._id;
 
-    const property = await Property.findById(deletePropertyId);
-    if (!property) {
-        return next(new ErrorHandler("Property is not Found!", 404));
-    }
+  const property = await Property.findById(deletePropertyId);
+  if (!property) return next(new ErrorHandler("Property is not Found!", 404));
 
-    if (property.userId.toString() !== userId.toString()) {
-        return next(new ErrorHandler("Unauthorized to  hard delete this property", 403));
-    }
+  if (property.userId.toString() !== userId.toString()) {
+    return next(new ErrorHandler("Unauthorized to hard delete this property", 403));
+  }
 
-    // ☁️ Cloudinary image delete
-    if (property.image?.public_id) {
-        await cloudinary.uploader.destroy(property.image.public_id);
-    }
+  if (property.image?.public_id) {
+    await cloudinary.uploader.destroy(property.image.public_id);
+  }
 
-    //  hard delete Remove from DB
-    await Property.findByIdAndDelete(deletePropertyId);
-    res.status(200).json({
-        success: true,
-        message: "Property marked as expired (soft deleted) successfully!",
-    })
-})
+  await Property.findByIdAndDelete(deletePropertyId);
+  res.status(200).json({
+    success: true,
+    message: "Property deleted permanently!",
+  });
+});
 
-//Reactive Property (Only Owner Can Reactive the property )
+/** ----------------- Reactivate Property ----------------- **/
 export const reactiveProperty = catchAsyncError(async (req, res, next) => {
-    const propertyId = req.params.id;
-    const userId = req.user._id;
+  const propertyId = req.params.id;
+  const userId = req.user._id;
 
-    const property = await Property.findById(propertyId);
-    if (!property) {
-        return next(new ErrorHandler("Property in not Found", 404));
-    }
-    if (property.userId.toString() !== userId.toString()) {
-        return next(new ErrorHandler("Unauthorized to reactivate this property!", 403));
-    }
-    if (!property.expired) {
-        return next(new ErrorHandler("Property is already active!", 400));
-    }
-    property.expired = false;
-    await property.save();
+  const property = await Property.findById(propertyId);
+  if (!property) return next(new ErrorHandler("Property not Found", 404));
 
-    res.status(200).json({
-        success: true,
-        message: "Property reactivated successfully!",
-        property,
-    });
-})
+  if (property.userId.toString() !== userId.toString()) {
+    return next(new ErrorHandler("Unauthorized to reactivate this property!", 403));
+  }
 
-// Host get all properties only host's own posts
+  if (!property.expired) {
+    return next(new ErrorHandler("Property is already active!", 400));
+  }
+
+  property.expired = false;
+  await property.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Property reactivated successfully!",
+    property,
+  });
+});
+
+/** ----------------- Get My Properties ----------------- **/
 export const getMyProperties = catchAsyncError(async (req, res, next) => {
-    const userId = req.user?._id;
+  const userId = req.user?._id;
+  const properties = await Property.find({ userId }).lean();
 
-    // Sirf current host ki properties fetch karo
-    const properties = await Property.find({ userId }).lean();
-
-    // Agar property empty hai
-    if (!properties || properties.length === 0) {
-        return res.status(200).json({
-            success: true,
-            count: 0,
-            message: "You are not post any kind of properties",
-            properties: []
-        });
-    }
-
-    res.status(200).json({
-        success: true,
-        count: properties.length,
-        properties,
+  if (!properties || properties.length === 0) {
+    return res.status(200).json({
+      success: true,
+      count: 0,
+      message: "You have not posted any properties yet",
+      properties: [],
     });
+  }
+
+  res.status(200).json({
+    success: true,
+    count: properties.length,
+    properties,
+  });
 });
 
-//get host only expired property Owner Only
+/** ----------------- Get My Expired ----------------- **/
 export const getMyExpiredProperty = catchAsyncError(async (req, res, next) => {
-    const userId = req.user._id; // ✅ Authenticated user's ID
+  const userId = req.user._id;
+  const property = await Property.find({ userId, expired: true });
 
-    // ✅ Find all properties where: posted by user AND expired = true
-    const property = await Property.find({ userId, expired: true });
+  if (!property || property.length === 0) {
+    return next(new ErrorHandler("No expired properties found for this user.", 404));
+  }
 
-    if (!property || property.length === 0) {
-        return next(new ErrorHandler("No expired properties found for this user.", 404));
-    }
-
-    res.status(200).json({
-        success: true,
-        count: property.length,
-        property, // ✅ return all matching properties
-    });
+  res.status(200).json({
+    success: true,
+    count: property.length,
+    property,
+  });
 });
 
-// Get all non-expired properties by category
+/** ----------------- Get Properties by Category ----------------- **/
 export const getPropertyByCategory = catchAsyncError(async (req, res, next) => {
-    const { category } = req.params;
-    const { city, location, priceMin, priceMax } = req.query;
+  const { category } = req.params;
+  const { city, location, priceMin, priceMax } = req.query;
 
-    if (!category) {
-        return next(new ErrorHandler("Category is required!", 400));
-    }
+  if (!category) {
+    return next(new ErrorHandler("Category is required!", 400));
+  }
 
-    const formattedCategory = category.trim();
-    const validCategories = Property.schema.path("category").enumValues;
+  const formattedCategory = category.trim();
+  const validCategories = Property.schema.path("category").enumValues;
 
-    if (!validCategories.includes(formattedCategory)) {
-        return next(new ErrorHandler("Invalid category!", 400));
-    }
+  if (!validCategories.includes(formattedCategory)) {
+    return next(new ErrorHandler("Invalid category!", 400));
+  }
 
-    // Optional filters
-    const filter = {
-        category: formattedCategory,
-        expired: false,
-    };
+  const filter = {
+    category: formattedCategory,
+    expired: false,
+  };
 
-    if (city) filter.city = city.trim().toLowerCase();
-    if (location) filter.location = location.trim().toLowerCase();
+  if (city) filter.city = city.trim().toLowerCase();
+  if (location) filter.location = location.trim().toLowerCase();
 
-    if (priceMin || priceMax) {
-        filter.price = {};
-        if (priceMin) filter.price.$gte = Number(priceMin);
-        if (priceMax) filter.price.$lte = Number(priceMax);
-    }
-    const properties = await Property.find(filter);
+  if (priceMin || priceMax) {
+    filter.price = {};
+    if (priceMin) filter.price.$gte = Number(priceMin);
+    if (priceMax) filter.price.$lte = Number(priceMax);
+  }
 
-    res.status(200).json({
-        success: true,
-        count: properties.length,
-        properties,
-    });
+  const properties = await Property.find(filter);
+
+  res.status(200).json({
+    success: true,
+    count: properties.length,
+    properties,
+  });
 });
