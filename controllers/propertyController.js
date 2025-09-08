@@ -182,21 +182,64 @@ export const editProperty = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler("Unauthorized to edit this property", 403));
   }
 
+  let {
+    title,
+    description,
+    price,
+    category,
+    country,
+    city,
+    location,
+    maxGuests,
+    roomSize,
+    privacy,
+    workspace,
+    bedType,
+    facilities,
+    views,
+    directContact,
+  } = req.body;
+
+  /** 🛠 Parse fields like in postProperty */
+  facilities = parseArray(facilities);
+  views = parseArray(views);
+  directContact = parseObject(directContact);
+  roomSize = parseRoomSize(roomSize);
+
   const updatedFields = {
-    title: req.body.title || property.title,
-    description: req.body.description || property.description,
-    price: req.body.price || property.price,
-    category: req.body.category || property.category,
-    country: req.body.country || property.country,
-    city: req.body.city || property.city,
-    location: req.body.location || property.location,
+    title: title || property.title,
+    description: description || property.description,
+    price: price || property.price,
+    category: category || property.category,
+    country: country || property.country,
+    city: city || property.city,
+    location: location || property.location,
+    maxGuests: maxGuests || property.maxGuests,
+    roomSize: roomSize || property.roomSize,
+    facilities: facilities.length ? facilities : property.facilities,
+    views: views.length ? views : property.views,
+    privacy: privacy || property.privacy,
+    workspace: workspace !== undefined ? workspace : property.workspace,
+    directContact: Object.keys(directContact || {}).length ? directContact : property.directContact,
+    bedType: bedType || property.bedType,
     expired: req.body.expired !== undefined ? req.body.expired : property.expired,
   };
 
+  /** 🌍 Update coordinates if location changed */
+  if (location && location !== property.location) {
+    const { lng, lat } = await getCoordinatesFromLocation(location);
+    updatedFields.coordinates = {
+      type: "Point",
+      coordinates: [lng, lat],
+    };
+  }
+
+  /** ☁️ Handle image update */
   if (req.file) {
     if (property.image?.public_id) {
       await cloudinary.uploader.destroy(property.image.public_id);
     }
+
     const streamUpload = (buffer) =>
       new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
@@ -213,6 +256,7 @@ export const editProperty = catchAsyncError(async (req, res, next) => {
     };
   }
 
+  /** ✅ Update property */
   const updatedProperty = await Property.findByIdAndUpdate(editPropertyId, updatedFields, {
     new: true,
     runValidators: true,
@@ -220,8 +264,8 @@ export const editProperty = catchAsyncError(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    message: "Property updated successfully!",
-    property: updatedProperty,
+    message: "Property updated successfully.",
+    updatedProperty,
   });
 });
 
