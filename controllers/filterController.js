@@ -19,7 +19,7 @@ export const PricesBaseFilter = catchAsyncError(async (req, res, next) => {
 
     const properties = await Property.find({ expired: false }).sort(sortOption);
     if (!properties || properties.length === 0) {
-        return next(new ErrorHandler("No properties found", 404));
+        return next(new ErrorHandler("No rooms match your selected filters. Please try again with different options.", 404));
     }
 
     res.status(200).json({
