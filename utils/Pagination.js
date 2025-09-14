@@ -4,7 +4,7 @@ import { Property } from "../models/Property.js";
 
 export const getProperties = catchAsyncError(async (req, res, next) => {
   // Query params se page aur limit lo, default 1 rakho
-  let { page = 1, limit = 1 } = req.query;
+  let { page = 1, limit = 10 } = req.query;
   page = Number(page);
   limit = Number(limit);
 
