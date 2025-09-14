@@ -80,9 +80,9 @@ const propertySchema = new mongoose.Schema({
       type: [Number], // [longitude, latitude]
       required: true,
     },
-  },
+  },  
 
-  // 🔹 New fields added here
+  // New fields added here
   maxGuests: {
     type: Number,
     required: true,

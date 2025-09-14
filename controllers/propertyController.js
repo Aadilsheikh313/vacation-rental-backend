@@ -414,3 +414,31 @@ export const getPropertyByCategory = catchAsyncError(async (req, res, next) => {
     properties,
   });
 });
+
+/** ----------------- Get Properties by Near By User ----------------- **/
+export const getNearbyProperties = async (req, res) => {
+  try {
+    const { latitude, longitude, distance } = req.query;
+    if (!latitude || !longitude) {
+      return res.status(400).json({ message: "Latitude & Longitude required" });
+    }
+
+    const radius = distance ? parseInt(distance) : 20000; // 20km in meters
+
+    const properties = await Property.find({
+      coordinates: {
+        $geoWithin: {
+          $centerSphere: [
+            [parseFloat(longitude), parseFloat(latitude)],
+            radius / 6378137, // meters / earth radius
+          ],
+        },
+      },
+    });
+
+    res.status(200).json({ count: properties.length, properties });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+

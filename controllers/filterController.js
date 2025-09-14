@@ -31,9 +31,14 @@ export const PricesBaseFilter = catchAsyncError(async (req, res, next) => {
 
 
 export const FilterRooms = catchAsyncError(async (req, res, next) => {
-    const { priceRange, capacity, view, features, bedType, sort } = req.body;
+    const { priceRange, capacity, view, features, bedType, location, sort } = req.body;
 
     let query = { expired: false };
+
+    // Location filter (case-insensitive)
+    if (location) {
+        query.city = { $regex: location.trim(), $options: "i" };
+    }
 
     //Price Filter
     if (priceRange) {
