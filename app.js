@@ -32,6 +32,7 @@ import amenityRoutes from "./routes/amenityRoutes.js";
 import policyRoutes from './routes/policyRoutes.js';
 import filterRoutes from './routes/filterRoutes.js';
 import paginationRoutes from './routes/paginationRouter.js';
+import guestRoutes from './routes/GuestDashRoutes.js';
 
 
 const app = express();
@@ -89,6 +90,7 @@ app.use("/api/amenities", amenityRoutes);
 app.use("/api/polices",policyRoutes);
 app.use("/api/filter",filterRoutes);
 app.use('/api/page', paginationRoutes);
+app.use('/api/guestDash', guestRoutes);
 
 
 // ✅ Test route

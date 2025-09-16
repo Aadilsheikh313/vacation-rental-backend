@@ -401,6 +401,7 @@ export const getActiveBooking = catchAsyncError(async (req, res, next) => {
     bookings,
   });
 });
+
 // Get all host histroy booking property only
 export const getHostBookingHistory = catchAsyncError(async (req, res, next) => {
   const hostId = req.user._id;
