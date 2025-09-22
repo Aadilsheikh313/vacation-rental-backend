@@ -6,7 +6,6 @@ import {
     editBookingPropertyDate,
     getBookingProperty,
     postBookingProperty,
-    getPastandCancelledBooking,
     getActiveBooking,
     getHostBookingHistory,
     deleteGuestHistroyBooking,
@@ -24,7 +23,6 @@ router.delete("/bookings/:bookingId/delete", isAuthorized, cancelBookingProperty
 
 // ✅ Add conflict check route
 router.get("/bookings/:propertyId/conflict-check", isAuthorized, checkBookingConflict);
-router.get("/past-or-cancelled", isAuthorized, getPastandCancelledBooking);
 router.delete("/guest/delete-history/:bookingId", isAuthorized, deleteGuestHistroyBooking);
 
 

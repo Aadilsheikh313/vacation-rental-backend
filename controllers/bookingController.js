@@ -28,81 +28,147 @@ export const getBookingProperty = catchAsyncError(async (req, res, next) => {
   });
 });
 
+
 export const postBookingProperty = catchAsyncError(async (req, res, next) => {
   const {
     checkIn,
     checkOut,
     guests,
-    numberOfNights,
-    serviceFee,
-    taxes,
-    paymentMethod
+    serviceFee: clientServiceFee = 0,
+    paymentMethod,
+    discountAmount = 0,
+    couponCode = null,
   } = req.body;
+
   const propertyId = req.params.propertyId;
 
-  if (!checkIn || !checkOut || !guests || !numberOfNights || !paymentMethod) {
+  // ✅ Basic validation
+  if (!checkIn || !checkOut || !guests || !paymentMethod) {
     return next(new ErrorHandler("All booking fields are required", 400));
   }
+  if (!Number.isInteger(guests.adults) || guests.adults < 1) {
+    return next(new ErrorHandler("At least one adult is required", 400));
+  }
+
+  // ✅ Parse dates
+  const checkInDate = new Date(checkIn);
+  const checkOutDate = new Date(checkOut);
+  checkOutDate.setHours(0,0,0,0);
+  if (isNaN(checkInDate) || isNaN(checkOutDate)) {
+    return next(new ErrorHandler("Invalid check-in or check-out date", 400));
+  }
+  // Normalize both dates (set time to midnight)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  checkInDate.setHours(0, 0, 0, 0);
+
+  if (checkInDate < today) {
+    return next(new ErrorHandler("Check-in date cannot be in the past.", 400));
+  }
+
 
   const property = await Property.findById(propertyId);
   if (!property) return next(new ErrorHandler("Property not found", 404));
 
-  //Check if the user is a guest or host
-  if (req.user?.role.toLowerCase() === "host") {
+  // ❌ Hosts cannot book
+  if (req.user?.role?.toLowerCase() === "host") {
     return next(new ErrorHandler("Hosts are not allowed to book properties", 403));
   }
 
-  // ✅ Check if user has already booked this property
-  const existingBooking = await Booking.findOne({
-    user: req.user._id,
-    property: propertyId,
-    bookingStatus: { $in: ["pending", "confirmed"] },
-  });
+  // ✅ Calculate number of nights
+  const msInDay = 1000 * 60 * 60 * 24;
+  const numberOfNights = Math.ceil((checkOutDate - checkInDate) / msInDay);
 
-  if (existingBooking) {
-    return next(new ErrorHandler("You have already booked this property", 409));
-  }
-
-  // ✅ Check if property is booked for same dates by anyone
+  // ✅ Check overlapping bookings
   const conflict = await Booking.findOne({
     property: propertyId,
-    $or: [
-      { checkIn: { $lte: checkOut }, checkOut: { $gte: checkIn } }
-    ],
-    bookingStatus: { $in: ["pending", "confirmed"] }
+    bookingStatus: { $in: ["pending", "confirmed"] },
+    checkIn: { $lte: checkOutDate },
+    checkOut: { $gte: checkInDate },
   });
 
   if (conflict) {
     return next(new ErrorHandler("Property already booked for selected dates", 409));
   }
 
-  const pricePerNight = property.price;
-  const totalAmount = pricePerNight * numberOfNights + serviceFee + taxes;
+  // ✅ Price, tax, and total calculation
+  const pricePerNight = Number(property.price);
+  const subtotalAmount = pricePerNight * numberOfNights;
+  const serviceFee = Number(clientServiceFee) || 0;
+
+  // Example GST calculation
+  let gstRate = 0;
+  if (pricePerNight >= 1001 && pricePerNight <= 7499) gstRate = 12;
+  else if (pricePerNight >= 7500) gstRate = 18;
+
+  const taxAmount = Number(((subtotalAmount - discountAmount) * (gstRate / 100)).toFixed(2));
+  const totalAmount = Number((subtotalAmount - discountAmount + serviceFee + taxAmount).toFixed(2));
+
   const isCash = paymentMethod === "cash";
 
-  const booking = await Booking.create({
-    user: req.user._id,
-    property: property._id,
-    checkIn,
-    checkOut,
-    guests,
-    pricePerNight,
-    numberOfNights,
-    serviceFee,
-    taxes,
-    totalAmount,
-    paymentMethod,
-    paymentStatus: isCash ? "paid" : "pending",
-    bookingStatus: isCash ? "confirmed" : "pending",
-  });
+  // ✅ Transaction to avoid race condition
+  const session = await mongoose.startSession();
+  let createdBooking;
+
+  try {
+    await session.withTransaction(async () => {
+      // Re-check conflict inside transaction
+      const conflict2 = await Booking.findOne({
+        property: propertyId,
+        bookingStatus: { $in: ["pending", "confirmed"] },
+        checkIn: { $lte: checkOutDate },
+        checkOut: { $gte: checkInDate },
+      }).session(session);
+
+      if (conflict2) throw new Error("Property already booked for selected dates");
+
+      const docs = await Booking.create(
+        [
+          {
+            guest: req.user._id,
+            property: property._id,
+            checkIn: checkInDate,
+            checkOut: checkOutDate,
+            subtotalAmount,
+            discountAmount,
+            couponCode,
+            taxAmount,
+            totalAmount,
+            paymentMethod,
+            paymentStatus: isCash ? "paid" : "pending",
+            bookingStatus: isCash ? "confirmed" : "pending",
+            createdBy: req.user._id,
+            updatedBy: req.user._id,
+            statusHistory: [
+              {
+                status: isCash ? "confirmed" : "pending",
+                changedBy: req.user._id,
+                note: "Initial booking",
+              },
+            ],
+          },
+        ],
+        { session }
+      );
+
+      createdBooking = docs[0];
+    });
+  } catch (err) {
+    if (err.message && err.message.includes("Property already booked")) {
+      return next(new ErrorHandler("Property already booked for selected dates", 409));
+    }
+    return next(err);
+  } finally {
+    session.endSession();
+  }
 
   res.status(201).json({
     success: true,
     message: "Booking created successfully",
-    booking,
+    booking: createdBooking,
   });
 });
-
 
 // Expend the booking date both 
 export const editBookingPropertyDate = catchAsyncError(async (req, res, next) => {
@@ -250,60 +316,41 @@ export const checkBookingConflict = catchAsyncError(async (req, res, next) => {
   const { propertyId } = req.params;
   const { userId } = req.query;
 
-  // ✅ Validate property ID
   if (!mongoose.Types.ObjectId.isValid(propertyId)) {
     return next(new ErrorHandler("Invalid Property ID", 400));
   }
 
-  // ✅ Check if the user already booked it (optional check)
   const existingBooking = userId
     ? await Booking.findOne({
-      user: userId,
-      property: propertyId,
-      bookingStatus: { $in: ["pending", "confirmed"] },
-    })
+        guest: userId, // your Booking model field for user
+        property: propertyId,
+        bookingStatus: { $in: ["pending", "confirmed"] },
+        checkOut: { $gte: new Date() }, // only future bookings
+      })
     : null;
 
-  // ✅ Get booked dates (only future/ongoing bookings)
+  if (existingBooking) {
+    return next(new ErrorHandler(
+      "You have already booked this property. To extend or edit your booking dates, please visit your Guest Dashboard.",
+      409
+    ));
+  }
+
   const conflictBookings = await Booking.find({
-    property: propertyId,
-    bookingStatus: { $in: ["pending", "confirmed"] },
-    checkOut: { $gte: new Date() },  // ignore past bookings
-  }).select("checkIn checkOut");
+  property: propertyId,
+  bookingStatus: { $in: ["pending", "confirmed"] },
+  checkOut: { $gte: new Date() },
+  guest: { $ne: userId } // exclude current guest to show only other guests bookings
+}).select("checkIn checkOut guest");
+
 
   res.status(200).json({
     success: true,
-    alreadyBooked: !!existingBooking,
+    alreadyBooked: false,
     bookedDates: conflictBookings,
   });
 });
 
-//Guest past Booking and canceled booking
-export const getPastandCancelledBooking = catchAsyncError(async (req, res, next) => {
-  const today = new Date();
-
-  const bookings = await Booking.find({
-    user: req.user._id,
-    $or: [
-      { bookingStatus: "cancelled" },
-      { checkOut: { $lt: today } }
-    ]
-  })
-    .populate({
-      path: "property",
-      select: "title image city userId",
-      populate: {
-        path: "userId",
-        select: "name email phone"
-      }
-    })
-    .sort({ createdAt: -1 });
-
-  res.status(200).json({
-    success: true,
-    bookings,
-  });
-})
 
 // Delete the Guest's past and cancelled booking history
 export const deleteGuestHistroyBooking = catchAsyncError(async (req, res, next) => {
