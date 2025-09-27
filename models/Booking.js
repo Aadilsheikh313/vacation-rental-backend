@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const bookingSchema = new mongoose.Schema(
   {
     // 🔹 Guest (User) info
-    guest: {
+    user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",        // Refers to User model
       required: true,

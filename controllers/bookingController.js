@@ -9,7 +9,7 @@ import sendEmail from "../utils/emailService.js";
 
 // Get all bookings for logged-in user
 export const getBookingProperty = catchAsyncError(async (req, res, next) => {
-  const bookings = await Booking.find({ user: req.user._id })
+  const bookings = await Booking.find({ guest: req.user._id })
 
     .populate({
       path: "property",
@@ -53,7 +53,7 @@ export const postBookingProperty = catchAsyncError(async (req, res, next) => {
   // ✅ Parse dates
   const checkInDate = new Date(checkIn);
   const checkOutDate = new Date(checkOut);
-  checkOutDate.setHours(0,0,0,0);
+  checkOutDate.setHours(0, 0, 0, 0);
   if (isNaN(checkInDate) || isNaN(checkOutDate)) {
     return next(new ErrorHandler("Invalid check-in or check-out date", 400));
   }
@@ -128,6 +128,7 @@ export const postBookingProperty = catchAsyncError(async (req, res, next) => {
           {
             guest: req.user._id,
             property: property._id,
+            guests,
             checkIn: checkInDate,
             checkOut: checkOutDate,
             subtotalAmount,
@@ -311,42 +312,79 @@ export const cancelBookingPropertyDate = catchAsyncError(async (req, res, next) 
 });
 
 // Check already booking date alvible  yah not avale 
-
 export const checkBookingConflict = catchAsyncError(async (req, res, next) => {
   const { propertyId } = req.params;
-  const { userId } = req.query;
+  const { userId, checkIn, checkOut } = req.query;
 
+  // ---------------------------
+  // 1️⃣ Validate Inputs
+  // ---------------------------
   if (!mongoose.Types.ObjectId.isValid(propertyId)) {
     return next(new ErrorHandler("Invalid Property ID", 400));
   }
-
-  const existingBooking = userId
-    ? await Booking.findOne({
-        guest: userId, // your Booking model field for user
-        property: propertyId,
-        bookingStatus: { $in: ["pending", "confirmed"] },
-        checkOut: { $gte: new Date() }, // only future bookings
-      })
-    : null;
-
-  if (existingBooking) {
-    return next(new ErrorHandler(
-      "You have already booked this property. To extend or edit your booking dates, please visit your Guest Dashboard.",
-      409
-    ));
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    return next(new ErrorHandler("Invalid User ID", 400));
+  }
+  if (!checkIn || !checkOut) {
+    return next(new ErrorHandler("Check-in and Check-out dates are required", 400));
   }
 
+  const checkInDate = new Date(checkIn);
+  const checkOutDate = new Date(checkOut);
+  const today = new Date();
+
+
+  // ---------------------------
+  // 2️⃣ SAME USER overlapping bookings
+  // ---------------------------
+  const existingBooking = await Booking.findOne({
+    user: userId,
+    property: propertyId,
+    bookingStatus: { $in: ["pending", "confirmed"] },
+    checkOut: { $gte: today }, // future/active bookings
+    $or: [
+      {
+        checkIn: { $lt: checkOutDate },
+        checkOut: { $gt: checkInDate }
+      }
+    ]
+  }).select("checkIn checkOut bookingStatus");
+
+  if (existingBooking) {
+    return res.status(200).json({
+      success: true,
+      alreadyBookedByUser: true,
+      existingBooking: {
+        checkIn: existingBooking.checkIn,
+        checkOut: existingBooking.checkOut,
+        status: existingBooking.bookingStatus,
+      },
+      message: "You have already booked this property. To edit your booking, visit Guest Dashboard.",
+    });
+  }
+
+  // ---------------------------
+  // 3️⃣ OTHER USERS overlapping bookings
+  // ---------------------------
   const conflictBookings = await Booking.find({
-  property: propertyId,
-  bookingStatus: { $in: ["pending", "confirmed"] },
-  checkOut: { $gte: new Date() },
-  guest: { $ne: userId } // exclude current guest to show only other guests bookings
-}).select("checkIn checkOut guest");
+    property: propertyId,
+    user: { $ne: userId },
+    bookingStatus: { $in: ["pending", "confirmed"] },
+    checkOut: { $gte: today },
+    $and: [
+      { checkIn: { $lt: checkOutDate } },
+      { checkOut: { $gt: checkInDate } }
+    ]
+}).select("checkIn checkOut user");
 
 
+  // ---------------------------
+  // 4️⃣ Return Response
+  // ---------------------------
   res.status(200).json({
     success: true,
-    alreadyBooked: false,
+    alreadyBookedByUser: false,
+    alreadyBooked: conflictBookings.length > 0,
     bookedDates: conflictBookings,
   });
 });
