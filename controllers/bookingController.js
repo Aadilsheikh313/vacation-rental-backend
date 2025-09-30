@@ -332,6 +332,9 @@ export const checkBookingConflict = catchAsyncError(async (req, res, next) => {
   const checkInDate = new Date(checkIn);
   const checkOutDate = new Date(checkOut);
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  checkInDate.setHours(0, 0, 0, 0);
+  checkOutDate.setHours(0, 0, 0, 0);
 
 
   // ---------------------------

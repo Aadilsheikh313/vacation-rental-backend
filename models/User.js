@@ -24,7 +24,7 @@ const userSchema = new mongoose.Schema({
         required: [true, "Please provide your phone number."],
         validate: {
             validator: function (v) {
-                return /^[0-9]{10}$/.test(v); // 10-digit number
+                return /^[6-9][0-9]{9}$/.test(v);// 10-digit number
             },
             message: "Phone number must be 10 digits",
         },
@@ -41,6 +41,36 @@ const userSchema = new mongoose.Schema({
         required: [true, "Please provide your role"],
         enum: ["guest", "host", "Guest", "Host"],
     },
+      // ===== Optional fields for later profile update =====
+    avatar: {
+        public_id: String,
+        url: {
+            type: String,
+            default: "https://res.cloudinary.com/dx9f6m2wz/image/upload/v1697056148/default_avatar_oqtqok.png",
+        },
+    },
+    
+    bio: {
+        type: String,
+        maxlength: 500,
+        trim: true,
+        default: "",
+    },
+    dob: {
+        type: Date,
+        required: false,
+    },
+    gender: {
+        type: String,
+        enum: ["Male", "Female", "Other"],
+        required: false,
+    },
+    location: {
+        type: String,
+        maxlength: 100,
+        required: false,
+    },
+
     lastLogin: {
         type: Date,
         default: null,
@@ -118,6 +148,19 @@ userSchema.methods.getJWTToken = function () {
         expiresIn: process.env.JWT_EXPIRE
     });
 };
+
+//Virtual field for bookings made by the user
+userSchema.virtual("initials").get(function() {
+    if (!this.name) return ""; // agar name nahi hai
+    const nameParts = this.name.split(" ");
+    let initials = "";
+    if (nameParts.length === 1) {
+        initials = nameParts[0].charAt(0).toUpperCase();
+    } else {
+        initials = nameParts[0].charAt(0).toUpperCase() + nameParts[1].charAt(0).toUpperCase();
+    }
+    return initials;
+});
 
 
 export const User = mongoose.model("User", userSchema);

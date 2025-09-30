@@ -43,7 +43,7 @@ const bookingSchema = new mongoose.Schema(
     // 🔹 Payment Info
     paymentMethod: {
       type: String,
-      enum: ["card", "upi", "netbanking", "wallet", "cash"],
+      enum: ["card", "upi", "netbanking", "wallet", "cash", "qr"],
       default: "card",
     },
     paymentStatus: {
@@ -119,7 +119,15 @@ const bookingSchema = new mongoose.Schema(
 );
 
 // ✅ Indexes for faster queries
-bookingSchema.index({ guest: 1, property: 1, checkIn: 1 });
+bookingSchema.index({ user: 1, property: 1, checkIn: 1 });
 bookingSchema.index({ bookingStatus: 1, paymentStatus: 1 });
+
+bookingSchema.pre("save", function (next) {
+  if (this.checkOut <= this.checkIn) {
+    return next(new Error("Check-out date must be after check-in date"));
+  }
+  next();
+});
+
 
 export const Booking = mongoose.model("Booking", bookingSchema);
