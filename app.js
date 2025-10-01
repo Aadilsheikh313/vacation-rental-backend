@@ -33,6 +33,7 @@ import policyRoutes from './routes/policyRoutes.js';
 import filterRoutes from './routes/filterRoutes.js';
 import paginationRoutes from './routes/paginationRouter.js';
 import guestRoutes from './routes/GuestDashRoutes.js';
+import userRoutes from './routes/userRouter.js';
 
 
 const app = express();
@@ -91,6 +92,7 @@ app.use("/api/polices",policyRoutes);
 app.use("/api/filter",filterRoutes);
 app.use('/api/page', paginationRoutes);
 app.use('/api/guestDash', guestRoutes);
+app.use('/api/userProfile', userRoutes);
 
 
 // ✅ Test route

@@ -59,16 +59,19 @@ const userSchema = new mongoose.Schema({
     dob: {
         type: Date,
         required: false,
+        default: null, 
     },
     gender: {
         type: String,
         enum: ["Male", "Female", "Other"],
         required: false,
+        default: null, 
     },
     location: {
         type: String,
         maxlength: 100,
         required: false,
+        default: null, 
     },
 
     lastLogin: {
@@ -113,13 +116,7 @@ const userSchema = new mongoose.Schema({
         maxlength: 500,
     },
 
-
-    createdAt: {
-        type: Date,
-        default: Date.now,
-    },
-
-});
+},{ timestamps: true });
 
 // HASING THE PASSWORD
 
