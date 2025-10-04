@@ -138,7 +138,7 @@ const propertySchema = new mongoose.Schema({
   directContact: {
     phone: {
       type: String,
-      match: [/^\+?[0-9]{7,15}$/, "Please enter a valid phone number"],
+      match: [/^\+?[6-9]{7,15}$/, "Please enter a valid phone number"],
       trim: true,
     },
     email: {
@@ -165,7 +165,7 @@ const propertySchema = new mongoose.Schema({
     default: null,
   },
   inActiveAt: { type: Date, default: null },
-  ActiveAt: { type: Date, default: null },
+  activeAt: { type: Date, default: null },
   inActiveReason: {
     type: String,
     default: null,

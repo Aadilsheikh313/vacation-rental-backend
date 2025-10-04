@@ -1,0 +1,106 @@
+import mongoose from "mongoose";
+
+const hostSchema = new mongoose.Schema(
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      unique: true,
+    },
+
+    verificationStatus: {
+      type: String,
+      enum: ["pending", "verified", "rejected"],
+      default: "pending",
+    },
+
+    verifiedAt: { type: Date, default: null },
+    rejectedAt: { type: Date, default: null },
+    rejectedReason: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: 500,
+    },
+
+    appliedAt: { type: Date, default: Date.now() },
+    lastUpdatedAt: { type: Date, default: Date.now() },
+    adminNote: { type: String, default: null, trim: true, maxlength: 500 },
+
+    governmentID: {
+      type: String,
+      enum: ["passport", "voter-id", "driving-license", "Aadhaar-card", "other"],
+      trim: true,
+    },
+    governmentIDImage: {
+      public_id: { type: String, required: false },
+      url: { type: String, required: false },
+    },
+
+    payout: {
+      razorpayAccountId: { type: String, default: null },
+      upiId: { type: String, default: null },
+      bankDetails: {
+        accountHolderName: { type: String, default: null },
+        accountNumber: { type: String, default: null },
+        ifscCode: { type: String, default: null },
+        bankName: { type: String, default: null },
+        branchName: { type: String, default: null },
+        cancelledChequeImage: {
+          public_id: { type: String, default: null },
+          url: { type: String, default: null },
+        },
+      },
+      qrCodeUrl: { type: String, default: null },
+      netBanking: {
+        bankName: { type: String, default: null },
+        accountHolderName: { type: String, default: null },
+        accountNumber: { type: String, default: null },
+        ifscCode: { type: String, default: null },
+      },
+      defaultPayoutMethod: {
+        type: String,
+        enum: ["razorpay", "upi", "bank", "qr", "card", "netbanking"],
+        default: "card",
+      },
+    },
+
+    earnings: {
+      totalEarnings: { type: Number, default: 0 },
+      pendingPayouts: { type: Number, default: 0 },
+      completedPayouts: { type: Number, default: 0 },
+      lastPayoutAt: { type: Date, default: null },
+    },
+
+    hostProperties: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Property",
+      },
+    ],
+
+    rating: {
+      avgRating: { type: Number, default: 0 },
+      totalReviews: { type: Number, default: 0 },
+    },
+
+    audit: [
+      {
+        action: { type: String, enum: ["applied", "verified", "rejected", "banned", "unbanned"], required: true },
+        performedBy: { type: mongoose.Schema.Types.ObjectId, refPath: "audit.performedByModel" },
+        performedByModel: { type: String, enum: ["Admin", "User"] },
+        note: { type: String, trim: true, maxlength: 500 },
+        date: { type: Date, default: Date.now },
+      },
+    ],
+  },
+  { timestamps: true }
+);
+
+// Indexes for faster queries
+// hostSchema.index({ user: 1 });
+hostSchema.index({ verificationStatus: 1 });
+hostSchema.index({ "earnings.totalEarnings": -1 });
+
+export const Host = mongoose.model("Host", hostSchema);

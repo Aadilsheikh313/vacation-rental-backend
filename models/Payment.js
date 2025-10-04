@@ -21,11 +21,16 @@ const paymentSchema = new mongoose.Schema(
     qrCodeUrl: { type: String, default: null },
 
     status: { type: String, enum: ["success", "failed", "pending", "refunded"], default: "success" },
-    refundedAmount: { type: Number, default: 0 }, // track partial/full refunds
+    refundedAmount: { type: Number, default: 0 },
 
     hostId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User", // property ka host
+      required: true
+    },
+
+    hostRazorpayAccount: {
+      type: String, // Connected Razorpay account ID of the host
       required: true
     },
 
@@ -42,7 +47,7 @@ const paymentSchema = new mongoose.Schema(
 
     platformFee: {
       type: Number,
-      default: 0
+      default: 0 // 2% automatically calculate
     },
   },
   { timestamps: true }

@@ -1,29 +1,29 @@
-
 import { catchAsyncError } from "../middlewares/catchAsyncError.js";
 import ErrorHandler from "../middlewares/errorMiddleware.js";
+import { Host } from "../models/HostSchema.js";
 import { User } from "../models/User.js";
 import { sendToken } from "../utils/generateToken.js";
 
 
-
 export const register = catchAsyncError(async (req, res, next) => {
-    const { name, email, phone, role, password } = req.body;
+  let { name, email, phone, role, password } = req.body;
+  if (!name || !email || !phone || !password) {
+    return next(new ErrorHandler("Please fill full registration form!", 400));
+  }
+  role = (role || "guest").toLowerCase();
 
-    if (!name || !email || !phone || !role || !password) {
-        return next(new ErrorHandler("Please fill full registration from!", 400));
-    }
+  const existing = await User.findOne({ email });
+  if (existing) return next(new ErrorHandler("Email already exists", 400));
 
-    const isEmail = await User.findOne({ email });
-    if (isEmail) {
-        return next(new ErrorHandler("Email is already exists"));
+  const user = await User.create({ name, email, phone, role, password });
 
-    }
-    const user = await User.create({
-        name, email, phone, role, password
-    });
+  if (role === "host") {
+    await Host.create({ user: user._id, verificationStatus: "pending" });
+  }
 
-    sendToken(user, 200, res, "User Registered Successfully!");
+  sendToken(user, 200, res, "User Registered Successfully!");
 });
+
 
 export const login = catchAsyncError(async (req, res, next) => {
 
