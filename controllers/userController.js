@@ -1,4 +1,3 @@
-import { resolve } from "path";
 import cloudinary from "../config/cloudinary.js";
 import { catchAsyncError } from "../middlewares/catchAsyncError.js";
 import ErrorHandler from "../middlewares/errorMiddleware.js";
@@ -25,8 +24,13 @@ export const userProfile = catchAsyncError(async (req, res, next) => {
 // ================= Update Profile Controller =================
 
 export const updateUserProfile = catchAsyncError(async (req, res, next) => {
+  console.log("🧾 req.body:", req.body);
+  console.log("🖼️ req.file:", req.file);
+  console.log("👤 req.user:", req.user);
   const { name, phone, avatar, bio, dob, gender, location } = req.body;
   const user = await User.findById(req.user._id);
+  console.log("✅ req.user:", req.user);
+
   if (!user) return next(new ErrorHandler("User not found", 404));
 
   if (name) user.name = name;
@@ -37,7 +41,7 @@ export const updateUserProfile = catchAsyncError(async (req, res, next) => {
   if (location) user.location = location;
 
   //Avator 
-  if (req.file) {
+  if (req.file && req.file.buffer) {
     // Purani image delte karo
     if (user.avatar?.public_id) {
       await cloudinary.uploader.destroy(user.avatar?.public_id);
