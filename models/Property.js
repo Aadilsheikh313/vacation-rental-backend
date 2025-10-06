@@ -80,7 +80,7 @@ const propertySchema = new mongoose.Schema({
       type: [Number], // [longitude, latitude]
       required: true,
     },
-  },  
+  },
 
   // New fields added here
   maxGuests: {
@@ -120,7 +120,7 @@ const propertySchema = new mongoose.Schema({
   views: [
     {
       type: String,
-      enum: ["City View", "Ocean View", "Mountain View","City Skyline", "Garden View", "Pool View"],
+      enum: ["City View", "Ocean View", "Mountain View", "City Skyline", "Garden View", "Pool View"],
     },
   ],
 
@@ -138,9 +138,10 @@ const propertySchema = new mongoose.Schema({
   directContact: {
     phone: {
       type: String,
-      match: [/^\+?[6-9]{7,15}$/, "Please enter a valid phone number"],
+      match: [/^(\+91[-\s]?)?[6-9]\d{9}$/, "Please enter a valid phone number"],
       trim: true,
     },
+
     email: {
       type: String,
       match: [/^\S+@\S+\.\S+$/, "Please enter a valid email address"],

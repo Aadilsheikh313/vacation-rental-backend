@@ -98,9 +98,13 @@ const hostSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Indexes for faster queries
-// hostSchema.index({ user: 1 });
-hostSchema.index({ verificationStatus: 1 });
-hostSchema.index({ "earnings.totalEarnings": -1 });
+
+hostSchema.index({ verificationStatus: 1, "earnings.totalEarnings": -1 });
+
+hostSchema.pre("save", function(next) {
+    this.lastUpdatedAt = Date.now();
+    next();
+});
+
 
 export const Host = mongoose.model("Host", hostSchema);

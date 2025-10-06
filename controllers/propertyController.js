@@ -4,6 +4,7 @@ import { Property } from "../models/Property.js";
 import streamifier from "streamifier";
 import cloudinary from "../config/cloudinary.js";
 import { getCoordinatesFromLocation } from "../config/mapApi.js";
+import { Host } from "../models/HostSchema.js";
 
 /** ----------------- Helper Parsers ----------------- **/
 const parseArray = (data) => {
@@ -60,6 +61,27 @@ export const getAllPropertyPosted = catchAsyncError(async (req, res, next) => {
 
 /** ----------------- Post New Property ----------------- **/
 export const postProperty = catchAsyncError(async (req, res, next) => {
+
+  const userId = req.user._id;
+  const userRole = req.user.role;
+
+  // ✅ 1. Check if user is host
+  const user = await User.findById(userId);
+  if (!user || user.role.toLowerCase() || userRole !== "host") {
+    return next(new ErrorHandler("Only verified hosts can post properties!", 403));
+  }
+
+  // ✅ 2. Check host verification status
+  const host = await Host.findOne({ user: userId });
+  if (!host) {
+    return next(new ErrorHandler("Host profile not found. Please complete your host profile.", 404));
+  }
+
+  if (host.verificationStatus !== "verified") {
+    return next(new ErrorHandler("Your host profile is not verified yet. Please wait for admin approval before posting a property.",
+      403));
+  }
+
   let {
     title,
     description,

@@ -11,14 +11,32 @@ export const submitHostProfile = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler("Please provide government ID and its image", 400));
   }
 
-  const host = await Host.findOne({ user: userId });
+  const host = await Host.findOneAndUpdate(
+    { user: userId },
+    { $set: { governmentID, governmentIDImage, payout, verificationStatus: "pending", lastUpdatedAt: Date.now() } },
+    { new: true, runValidators: true }
+);
+
   if (!host) return next(new ErrorHandler("Host profile not found", 404));
+
+  if (req.user.role !== "host") {
+    return next(new ErrorHandler("Only hosts can submit this form", 403));
+}
+
 
   host.governmentID = governmentID;
   host.governmentIDImage = governmentIDImage;
   if (payout) host.payout = payout; // optional
   host.verificationStatus = "pending";
   host.lastUpdatedAt = Date.now();
+
+  host.audit.push({
+    action: "applied",
+    performedBy: req.user._id,
+    performedByModel: "User",
+    note: "Host submitted profile for verification",
+});
+
 
   await host.save();
 
