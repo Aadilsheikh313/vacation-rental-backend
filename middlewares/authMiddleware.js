@@ -23,8 +23,6 @@ export const isAuthorized = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler("Invalid or expired token", 403));
   }
 
-  console.log("🔐 Decoded Token:", decoded);
-
   let user = await User.findById(decoded.id);
   if (user) {
     if (user.isBanned) {
