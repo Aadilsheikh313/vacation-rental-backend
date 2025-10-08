@@ -39,7 +39,7 @@ const userSchema = new mongoose.Schema({
     role: {
         type: String,
         required: [true, "Please provide your role"],
-        enum: ["guest", "host", "Guest", "Host"],
+        enum: ["guest", "host"],
     },
       // ===== Optional fields for later profile update =====
     avatar: {

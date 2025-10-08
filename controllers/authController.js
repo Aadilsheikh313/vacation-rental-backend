@@ -1,3 +1,5 @@
+import cloudinary from "../config/cloudinary.js";
+import streamifier from "streamifier";
 import { catchAsyncError } from "../middlewares/catchAsyncError.js";
 import ErrorHandler from "../middlewares/errorMiddleware.js";
 import { Host } from "../models/HostSchema.js";
@@ -6,23 +8,118 @@ import { sendToken } from "../utils/generateToken.js";
 
 
 export const register = catchAsyncError(async (req, res, next) => {
-  let { name, email, phone, role, password } = req.body;
-  if (!name || !email || !phone || !password) {
-    return next(new ErrorHandler("Please fill full registration form!", 400));
-  }
-  role = (role || "guest").toLowerCase();
+    let {
+        name,
+        email,
+        phone,
+        role,
+        password,
+        governmentID,
+        governmentIDNumber,
+        governmentIDImage,
+        cancelledChequeImage,
+        payout,
+    } = req.body;
 
-  const existing = await User.findOne({ email });
-  if (existing) return next(new ErrorHandler("Email already exists", 400));
+    console.log(req.body);
 
-  const user = await User.create({ name, email, phone, role, password });
+    // images aayengi -> req.files se (multiple files)
+    const files = req.files || {};
 
-  if (role === "host") {
-    await Host.create({ user: user._id, verificationStatus: "pending" });
-  }
+    if (!name || !email || !phone || !password || !role) {
+        return next(new ErrorHandler("Please fill full registration form!", 400));
+    }
 
-  sendToken(user, 200, res, "User Registered Successfully!");
+    role = role.toLowerCase();
+
+    const existing = await User.findOne({ email });
+    if (existing) return next(new ErrorHandler("Email already exists", 400));
+
+    const user = await User.create({ name, email, phone, role, password });
+
+    // 🏠 Host Registration
+    if (role === "host") {
+
+        let governmentIDImage = {};
+        let cancelledChequeImage = {};
+        let qrCodeUrl = null;
+
+        // ✅ Helper Function to upload file buffer to Cloudinary
+        const uploadToCloudinary = async (fileBuffer, folderName) => {
+            return new Promise((resolve, reject) => {
+                const stream = cloudinary.uploader.upload_stream(
+                    { folder: folderName },
+                    (error, result) => {
+                        if (result) resolve(result);
+                        else reject(error);
+                    }
+                );
+                streamifier.createReadStream(fileBuffer).pipe(stream);
+            });
+        };
+
+        // ✅ Upload Government ID Image (if provided)
+        if (files.governmentIDImage && files.governmentIDImage[0]) {
+            const result = await uploadToCloudinary(
+                files.governmentIDImage[0].buffer,
+                "host_verifications/governmentID"
+            );
+            governmentIDImage = {
+                public_id: result.public_id,
+                url: result.secure_url,
+            };
+        }
+
+        // ✅ Upload Cancelled Cheque Image (if provided)
+        if (files.cancelledChequeImage && files.cancelledChequeImage[0]) {
+            const result = await uploadToCloudinary(
+                files.cancelledChequeImage[0].buffer,
+                "host_verifications/cheque"
+            );
+            cancelledChequeImage = {
+                public_id: result.public_id,
+                url: result.secure_url,
+            };
+        }
+
+        // ✅ Upload UPI QR Code (if provided)
+        if (files.qrCode && files.qrCode[0]) {
+            const result = await uploadToCloudinary(
+                files.qrCode[0].buffer,
+                "host_verifications/upi_qr"
+            );
+            qrCodeUrl = result.secure_url;
+        }
+
+        // ✅ Host Document Create
+        const host = await Host.create({
+            user: user._id,
+            verificationStatus: "pending",
+            governmentID: governmentID || null,
+            governmentIDNumber: governmentIDNumber || null,
+            governmentIDImage: governmentIDImage,
+            cancelledChequeImage: cancelledChequeImage,
+            payout: {
+                ...payout,
+                qrCodeUrl: qrCodeUrl || null,
+            },
+            appliedAt: new Date(),
+            lastUpdatedAt: new Date(),
+            audit: [
+                {
+                    action: "applied",
+                    performedBy: user._id,
+                    performedByModel: "User",
+                    note: "Host registered and profile created",
+                    date: new Date(),
+                },
+            ],
+        });
+    }
+
+    sendToken(user, 200, res, "User Registered Successfully!");
 });
+
 
 
 export const login = catchAsyncError(async (req, res, next) => {
@@ -80,7 +177,7 @@ export const logout = catchAsyncError(async (req, res, next) => {
 export const getUser = catchAsyncError(async (req, res, next) => {
     const userId = req.user._id; // JWT se mila ID
 
-    const user = await User.findById(userId).select("-password"); 
+    const user = await User.findById(userId).select("-password");
     if (!user) {
         return next(new ErrorHandler("User not found!", 404));
     }

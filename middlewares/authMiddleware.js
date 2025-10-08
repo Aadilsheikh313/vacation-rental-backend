@@ -29,7 +29,7 @@ export const isAuthorized = catchAsyncError(async (req, res, next) => {
       return next(new ErrorHandler("Your account has been banned.", 403));
     }
     req.user = user;
-    req.user.role = decoded.role || "user";
+    // req.user.role = decoded.role || "user";
     return next();
   }
 

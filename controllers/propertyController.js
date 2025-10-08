@@ -70,11 +70,12 @@ export const postProperty = catchAsyncError(async (req, res, next) => {
 
   const userId = req.user._id;
   console.log("userId:", userId);
-
+  console.log("User role:", req.user.role);
   // 🧩 2️⃣ Check if user is a host
-  if (req.user.role !== "host") {
+  if (req.user.role.trim().toLowerCase() !== "host") {
     return next(new ErrorHandler("Only hosts can add properties", 403));
-  }
+}
+
 
   // ✅ 2. Check host verification status
   const host = await Host.findOne({ user: userId });
