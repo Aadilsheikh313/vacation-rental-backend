@@ -6,10 +6,21 @@ import { User } from "../models/User.js";
 import { Admin } from "../models/admin.js";
 
 export const isAuthorized = catchAsyncError(async (req, res, next) => {
-  let token = req.cookies.token;
-
-  if (!token && req.headers.authorization?.startsWith("Bearer ")) {
+  
+  let token;
+  // ✅ Prefer header token first
+  if (req.headers.authorization?.startsWith("Bearer ")) {
     token = req.headers.authorization.split(" ")[1];
+  } else if (req.cookies?.token) {
+    token = req.cookies.token;
+  }
+
+  // ✅ Try to get token from headers
+  if (!token && req.headers.authorization) {
+    const parts = req.headers.authorization.split(" ");
+    if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
+      token = parts[1];
+    }
   }
 
   if (!token) {
@@ -29,7 +40,6 @@ export const isAuthorized = catchAsyncError(async (req, res, next) => {
       return next(new ErrorHandler("Your account has been banned.", 403));
     }
     req.user = user;
-    // req.user.role = decoded.role || "user";
     return next();
   }
 
@@ -37,6 +47,7 @@ export const isAuthorized = catchAsyncError(async (req, res, next) => {
   if (admin) {
     req.admin = admin;
     req.admin.role = decoded.role || "admin";
+    req.admin.role = "admin";
     return next();
   }
 

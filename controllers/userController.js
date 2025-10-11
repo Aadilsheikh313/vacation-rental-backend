@@ -1,6 +1,7 @@
 import cloudinary from "../config/cloudinary.js";
 import { catchAsyncError } from "../middlewares/catchAsyncError.js";
 import ErrorHandler from "../middlewares/errorMiddleware.js";
+import { Host } from "../models/HostSchema.js";
 import { User } from "../models/User.js";
 import streamifier from "streamifier";
 
@@ -14,8 +15,27 @@ export const userProfile = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler("User not found", 404));
   }
 
+  // If user is HOST → Fetch host details
+  const role = user.role;
+ 
+  if (role === "host") {
+    const host = await Host.findOne({ user: user._id });
+
+    if (!host) {
+      return next(new ErrorHandler("Host details not found for this user.", 404));
+    }
+   const token = user.getJWTToken();
+    return res.status(200).json({
+      success: true,
+      message: "Host Profile Featch Successfully!",
+      token,
+      user,
+      host,
+    });
+  }
   res.status(200).json({
     success: true,
+    message: "User Profile fetched successfully!",
     user,
   });
 });
@@ -24,9 +44,6 @@ export const userProfile = catchAsyncError(async (req, res, next) => {
 // ================= Update Profile Controller =================
 
 export const updateUserProfile = catchAsyncError(async (req, res, next) => {
-  console.log("🧾 req.body:", req.body);
-  console.log("🖼️ req.file:", req.file);
-  console.log("👤 req.user:", req.user);
   const { name, phone, avatar, bio, dob, gender, location } = req.body;
   const user = await User.findById(req.user._id);
   console.log("✅ req.user:", req.user);

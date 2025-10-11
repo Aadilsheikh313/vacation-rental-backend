@@ -33,7 +33,14 @@ const hostSchema = new mongoose.Schema(
       enum: ["passport", "voter-id", "driving-license", "Aadhaar-card", "other"],
       trim: true,
     },
+    governmentIDNumber: { type: String, trim: true, maxlength: 100 },
+
     governmentIDImage: {
+      public_id: { type: String, required: false },
+      url: { type: String, required: false },
+    },
+
+    cancelledChequeImage: {
       public_id: { type: String, required: false },
       url: { type: String, required: false },
     },
@@ -47,10 +54,6 @@ const hostSchema = new mongoose.Schema(
         ifscCode: { type: String, default: null },
         bankName: { type: String, default: null },
         branchName: { type: String, default: null },
-        cancelledChequeImage: {
-          public_id: { type: String, default: null },
-          url: { type: String, default: null },
-        },
       },
       qrCodeUrl: { type: String, default: null },
       netBanking: {
@@ -101,9 +104,9 @@ const hostSchema = new mongoose.Schema(
 
 hostSchema.index({ verificationStatus: 1, "earnings.totalEarnings": -1 });
 
-hostSchema.pre("save", function(next) {
-    this.lastUpdatedAt = Date.now();
-    next();
+hostSchema.pre("save", function (next) {
+  this.lastUpdatedAt = Date.now();
+  next();
 });
 
 

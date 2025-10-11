@@ -12,6 +12,9 @@ router.get("/geocode", async (req, res) => {
     // ⚡ Query ko over-clean mat karo
     const cleanQuery = q.trim();
 
+    console.log("getCoordinatesFromLocation() called at:", new Date().toISOString());
+
+
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQuery)}`;
     console.log("🌍 Geocode request URL:", url);
 

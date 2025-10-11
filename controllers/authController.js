@@ -8,6 +8,12 @@ import { sendToken } from "../utils/generateToken.js";
 
 
 export const register = catchAsyncError(async (req, res, next) => {
+
+    // 🧠 Ensure form-data was received properly
+    if (!req.body || Object.keys(req.body).length === 0) {
+        return next(new ErrorHandler("No form data received. Please use form-data in Postman.", 400));
+    }
+
     let {
         name,
         email,
@@ -21,7 +27,6 @@ export const register = catchAsyncError(async (req, res, next) => {
         payout,
     } = req.body;
 
-    console.log(req.body);
 
     // images aayengi -> req.files se (multiple files)
     const files = req.files || {};
@@ -115,9 +120,20 @@ export const register = catchAsyncError(async (req, res, next) => {
                 },
             ],
         });
+
+         // ✅ Send JWT Token
+        const token = user.getJWTToken();
+        return res.status(200).json({
+            success: true,
+            message: "Host Registered Successfully!",
+            token,
+            user,
+            host,
+        });
     }
 
     sendToken(user, 200, res, "User Registered Successfully!");
+
 });
 
 
@@ -148,10 +164,12 @@ export const login = catchAsyncError(async (req, res, next) => {
 
     user.loginCount = (user.loginCount || 0) + 1;
 
-    if (user.role !== role) {
-        return next(new ErrorHandler("User with role is not found!", 400));
+    // ✅ Role verification
+    if (user.role !== role.toLowerCase()) {
+        return next(new ErrorHandler(`User with role '${role}' not found.`, 400));
     }
 
+    // ✅ Update login info
     await User.updateOne(
         { _id: user._id },
         {
@@ -160,6 +178,27 @@ export const login = catchAsyncError(async (req, res, next) => {
             $inc: { loginCount: 1 }
         }
     );
+
+
+    // ✅ If user is HOST → Fetch host details
+
+    if (user.role === "host") {
+        const host = await Host.findOne({ user: user._id });
+
+        if (!host) {
+            return next(new ErrorHandler("Host details not found for this user.", 404));
+        }
+
+        const token = user.getJWTToken();
+
+        return res.status(200).json({
+            success: true,
+            message: "Host logged in Successfully!",
+            token,
+            user,
+            host,
+        });
+    }
 
     sendToken(user, 200, res, "User logged in successfully!");
 })
@@ -174,16 +213,3 @@ export const logout = catchAsyncError(async (req, res, next) => {
     })
 })
 
-export const getUser = catchAsyncError(async (req, res, next) => {
-    const userId = req.user._id; // JWT se mila ID
-
-    const user = await User.findById(userId).select("-password");
-    if (!user) {
-        return next(new ErrorHandler("User not found!", 404));
-    }
-
-    res.status(200).json({
-        success: true,
-        user,
-    });
-});

@@ -62,28 +62,27 @@ export const getAllPropertyPosted = catchAsyncError(async (req, res, next) => {
 
 /** ----------------- Post New Property ----------------- **/
 export const postProperty = catchAsyncError(async (req, res, next) => {
-
-  // 🧩 1️⃣ Check if user is authorized
-  if (!req.user) {
-    return next(new ErrorHandler("User not authorized or not found", 401));
+  // Check if user is authenticated & is a host
+  if (!req.user && !req.admin) {
+    return next(new ErrorHandler("You must be logged in to post a property", 401));
   }
 
-  const userId = req.user._id;
-  console.log("userId:", userId);
-  console.log("User role:", req.user.role);
-  // 🧩 2️⃣ Check if user is a host
-  if (req.user.role.trim().toLowerCase() !== "host") {
+  const currentUser = req.user || req.admin;
+  const userRole = currentUser.role?.trim().toLowerCase();
+  const userId = currentUser._id;
+
+  // Only host can post property
+  if (userRole !== "host") {
     return next(new ErrorHandler("Only hosts can add properties", 403));
-}
+  }
 
 
-  // ✅ 2. Check host verification status
+  // Check host verification status
   const host = await Host.findOne({ user: userId });
-  console.log("Host found:", host);
   if (!host) {
     return next(new ErrorHandler("Host profile not found. Please complete your host profile.", 404));
   }
-  log("Host verification status:", host.verificationStatus);
+
   if (host.verificationStatus !== "verified") {
     return next(new ErrorHandler("Your host profile is not verified yet. Please wait for admin approval before posting a property.",
       403));
@@ -107,7 +106,7 @@ export const postProperty = catchAsyncError(async (req, res, next) => {
     directContact,
   } = req.body;
 
-  /** ✅ Validate required fields */
+  /* Validate required fields */
   if (!title || !description || !price || !category || !country || !city || !location || !maxGuests || !bedType) {
     return next(new ErrorHandler("Please fill out all required property details!", 400));
   }
@@ -124,7 +123,21 @@ export const postProperty = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler("Image is required. Please upload a property image.", 400));
   }
 
-  /** ☁️ Upload to Cloudinary */
+  const existingProperty = await Property.findOne({
+    userId: userId,
+    location: { $regex: new RegExp(`^${location.trim()}$`, "i") }
+  });
+
+  if (existingProperty) {
+    return next(
+      new ErrorHandler(
+        "You have already posted this property. Duplicate listings are not allowed.",
+        400
+      )
+    );
+  }
+
+  /* Upload to Cloudinary */
   const streamUpload = (buffer) => {
     return new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
@@ -139,16 +152,16 @@ export const postProperty = catchAsyncError(async (req, res, next) => {
   };
   const result = await streamUpload(req.file.buffer);
 
-  /** 📍 Convert location → coordinates */
+  /* Convert location → coordinates */
   const { lng, lat } = await getCoordinatesFromLocation(location);
 
-  /** 🛠 Parse Special Fields */
+  /* Parse Special Fields */
   facilities = parseArray(facilities);
   views = parseArray(views);
   directContact = parseObject(directContact);
   roomSize = parseRoomSize(roomSize);
 
-  /** 🏠 Create Property */
+  /* Create Property */
   const newProperty = await Property.create({
     title,
     description,

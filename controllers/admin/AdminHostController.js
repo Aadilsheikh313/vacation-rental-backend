@@ -2,6 +2,7 @@ import { catchAsyncError } from "../../middlewares/catchAsyncError.js";
 import { User } from "../../models/User.js";
 import {Property} from "../../models/Property.js"
 
+// ================= Get Total Hosts Controller function =================
 export const getTotalHosts = catchAsyncError(async(req, res, next) =>{
     const totalHosts = await User.countDocuments({
         role: {$in :["host", "Host"]}
@@ -231,4 +232,7 @@ export const getAdminBannedHosts = catchAsyncError(async (req, res, next) => {
     message: `${enrichedHosts.length} banned host(s) found.`,
   });
 });
+
+
+
 

@@ -20,14 +20,19 @@ import paymentRoutes from "./routes/paymentRoutes.js";
 import invoiceRoutes from "./routes/invoiceRoutes.js";
 import geocodeRouter from "./routes/geocode.js";
 import globalSearchRoutes from "./routes/globalSearchRoutes.js";
+
+//==================== Admin Routes start =================
 import adminRoutes from "./routes/adminroutes/adimauthRoutes.js";
 import adminHomeDashRoutes from "./routes/adminroutes/adminHomeDashRoutes.js";
 import adminDashboardRoutes from "./routes/adminroutes/adminDashboardRoutes.js";
 import adminHostRoutes from "./routes/adminroutes/adminHostRoutes.js";
 import adminGuestRoutes from "./routes/adminroutes/adminGuestRoutes.js";
 import adminBannedRoutes from "./routes/adminroutes/adminBannedUserRoutes.js";
+import admihVerifyRoutes from "./routes/adminroutes/HostVerificationRoutes.js";
 import adminPropertyRoutes from "./routes/adminroutes/activePropertyRoutes.js";
 import adminPostRoutes from "./routes/adminroutes/adminPostExperienceRoutes.js";
+
+//==================== Admin Routes end =================
 import amenityRoutes from "./routes/amenityRoutes.js";
 import policyRoutes from './routes/policyRoutes.js';
 import filterRoutes from './routes/filterRoutes.js';
@@ -79,14 +84,17 @@ app.use('/api/invoice', invoiceRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api', geocodeRouter);
 app.use("/api/search", globalSearchRoutes);
+//==================== Admin Routes start =================
 app.use('/api/v1', adminRoutes);
 app.use('/api/v1', adminHomeDashRoutes);
 app.use('/api/v1', adminDashboardRoutes);
 app.use('/api/v1', adminHostRoutes);
 app.use('/api/v1', adminGuestRoutes);
+app.use('/api/host-verify', admihVerifyRoutes); 
 app.use('/api/banned', adminBannedRoutes);
 app.use("/api/active/inactive", adminPropertyRoutes);
 app.use("/api/adminpost", adminPostRoutes);
+//==================== Admin Routes end =================
 app.use("/api/amenities", amenityRoutes);
 app.use("/api/polices",policyRoutes);
 app.use("/api/filter",filterRoutes);
@@ -108,7 +116,6 @@ connectDB();
 
 // ✅ Error middleware ALWAYS last
 app.use(errorMiddleware);
-
 
 export default app;
 
