@@ -88,6 +88,10 @@ export const postProperty = catchAsyncError(async (req, res, next) => {
       403));
   }
 
+  if (host.verificationStatus !== "rejected") {
+    return next(new ErrorHandler("Your host verification was rejected. Please update your documents or profile details and resubmit for admin approval.",
+      403));
+  }
   let {
     title,
     description,

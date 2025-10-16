@@ -1,4 +1,3 @@
-
 import { catchAsyncError } from "./catchAsyncError.js";
 import ErrorHandler from "./errorMiddleware.js";
 import jwt from "jsonwebtoken";

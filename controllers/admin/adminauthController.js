@@ -37,14 +37,12 @@ export const adminRegister = catchAsyncError(async (req, res, next) => {
   }
 
   const existingAdmin = await Admin.findOne({ email });
-  console.log("Admin email", existingAdmin);
-  
+
   if (existingAdmin) {
     return next(new ErrorHandler("Admin already exists with this email", 400));
   }
   try {
     const newAdmin = await Admin.create({ name, email, password, phone });
-    console.log("NEW ADMIN", newAdmin);
     
     sendToken(newAdmin, 201, res, "Admin registered successfully");
   } catch (err) {
