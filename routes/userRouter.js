@@ -6,6 +6,13 @@ import { upload } from "../middlewares/uploadMiddleware.js";
 const router = express.Router();
 
 router.get("/profile", isAuthorized,userProfile);
-router.put("/profile/update", isAuthorized,upload.single("avatar") ,updateUserProfile);
-
+router.put(
+  "/profile/update",
+  isAuthorized,
+  upload.fields([
+    { name: "avatar", maxCount: 1 },
+    { name: "governmentIDImage", maxCount: 1 },
+  ]),
+  updateUserProfile
+);
 export default router;
