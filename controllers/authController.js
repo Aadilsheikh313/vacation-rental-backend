@@ -93,7 +93,10 @@ export const register = catchAsyncError(async (req, res, next) => {
                 files.qrCode[0].buffer,
                 "host_verifications/upi_qr"
             );
-            qrCodeUrl = result.secure_url;
+            qrCodeUrl = {
+                public_id: result.public_id,
+                url: result.secure_url,
+            }
         }
 
         // ✅ Host Document Create
@@ -104,9 +107,10 @@ export const register = catchAsyncError(async (req, res, next) => {
             governmentIDNumber: governmentIDNumber || null,
             governmentIDImage: governmentIDImage,
             cancelledChequeImage: cancelledChequeImage,
+            qrCodeUrl: qrCodeUrl || null,
             payout: {
                 ...payout,
-                qrCodeUrl: qrCodeUrl || null,
+
             },
             appliedAt: new Date(),
             lastUpdatedAt: new Date(),
@@ -121,7 +125,7 @@ export const register = catchAsyncError(async (req, res, next) => {
             ],
         });
 
-         // ✅ Send JWT Token
+        // ✅ Send JWT Token
         const token = user.getJWTToken();
         return res.status(200).json({
             success: true,

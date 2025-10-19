@@ -30,7 +30,7 @@ const hostSchema = new mongoose.Schema(
 
     governmentID: {
       type: String,
-      enum: ["passport","PAN", "voter-id", "driving-license", "Aadhaar-card", "other"],
+      enum: ["passport", "PAN", "voter-id", "driving-license", "Aadhaar-card", "other"],
       trim: true,
     },
     governmentIDNumber: { type: String, trim: true, maxlength: 100 },
@@ -44,7 +44,10 @@ const hostSchema = new mongoose.Schema(
       public_id: { type: String, required: false },
       url: { type: String, required: false },
     },
-
+    qrCodeUrl: {
+      public_id: { type: String, required: false },
+      url: { type: String, required: false },
+    },
     payout: {
       razorpayAccountId: { type: String, default: null },
       upiId: { type: String, default: null },
@@ -55,7 +58,7 @@ const hostSchema = new mongoose.Schema(
         bankName: { type: String, default: null },
         branchName: { type: String, default: null },
       },
-      qrCodeUrl: { type: String, default: null },
+
       netBanking: {
         bankName: { type: String, default: null },
         accountHolderName: { type: String, default: null },

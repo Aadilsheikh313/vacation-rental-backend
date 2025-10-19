@@ -133,7 +133,7 @@ export const updateUserProfile = catchAsyncError(async (req, res, next) => {
 
     if(req.files?.qrCodeUrl?.[0]){
       const qrCodeBuffer = req.files.qrCodeUrl[0].buffer;
-      if(host.qrCodeUrl) await cloudinary.uploader.destroy(host.qrCodeUrl);
+      if(host.qrCodeUrl?.public_id) await cloudinary.uploader.destroy(host.qrCodeUrl.public_id);
       const qrCodeResult = await streamUpload(qrCodeBuffer, "upi_qr");
       host.qrCodeUrl = {public_id: qrCodeResult.public_id, url: qrCodeResult.secure_url};
     }
