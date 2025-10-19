@@ -5,41 +5,28 @@ import { Host } from "../models/HostSchema.js";
 import { User } from "../models/User.js";
 import streamifier from "streamifier";
 
-
 // ================= Get User Profile Controller =================
 export const userProfile = catchAsyncError(async (req, res, next) => {
   const userId = req.user._id;
   const user = await User.findById(userId).select("-password");
 
-  if (!user) {
-    return next(new ErrorHandler("User not found", 404));
+  if (!user) return next(new ErrorHandler("User not found", 404));
+
+  let host = null;
+  if (user.role === "host") {
+    host = await Host.findOne({ user: user._id });
+    if (!host) return next(new ErrorHandler("Host details not found for this user.", 404));
   }
 
-  // If user is HOST → Fetch host details
-  const role = user.role;
-
-  if (role === "host") {
-    const host = await Host.findOne({ user: user._id });
-
-    if (!host) {
-      return next(new ErrorHandler("Host details not found for this user.", 404));
-    }
-    const token = user.getJWTToken();
-    return res.status(200).json({
-      success: true,
-      message: "Host Profile Featch Successfully!",
-      token,
-      user,
-      host,
-    });
-  }
-  res.status(200).json({
+  const token = user.getJWTToken();
+  return res.status(200).json({
     success: true,
-    message: "User Profile fetched successfully!",
+    message: user.role === "host" ? "Host Profile Fetched Successfully!" : "User Profile Fetched Successfully!",
+    token,
     user,
+    host, // safe: will be null if user is not host
   });
 });
-
 
 // ================= Update Profile Controller =================
 export const updateUserProfile = catchAsyncError(async (req, res, next) => {
@@ -59,7 +46,7 @@ export const updateUserProfile = catchAsyncError(async (req, res, next) => {
   const user = await User.findById(req.user._id);
   if (!user) return next(new ErrorHandler("User not found", 404));
 
-  // ✅ Update basic info
+  // ✅ Update basic user info
   if (name) user.name = name;
   if (phone) user.phone = phone;
   if (bio) user.bio = bio;
@@ -70,66 +57,57 @@ export const updateUserProfile = catchAsyncError(async (req, res, next) => {
   // ✅ Helper: Upload buffer to Cloudinary
   const streamUpload = (buffer, folder) => {
     return new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        { folder },
-        (error, result) => {
-          if (result) resolve(result);
-          else reject(error);
-        }
-      );
+      const stream = cloudinary.uploader.upload_stream({ folder }, (error, result) => {
+        if (result) resolve(result);
+        else reject(error);
+      });
       streamifier.createReadStream(buffer).pipe(stream);
     });
   };
 
-  // ✅ Handle Avatar upload (if provided)
-  if (req.files && req.files.avatar && req.files.avatar[0]) {
+  // ✅ Avatar upload
+  if (req.files?.avatar?.[0]) {
     const avatarBuffer = req.files.avatar[0].buffer;
 
-    // Delete old avatar from Cloudinary
-    if (user.avatar?.public_id) {
-      await cloudinary.uploader.destroy(user.avatar.public_id);
-    }
+    if (user.avatar?.public_id) await cloudinary.uploader.destroy(user.avatar.public_id);
 
     const result = await streamUpload(avatarBuffer, "avatar");
     user.avatar = { public_id: result.public_id, url: result.secure_url };
   }
 
-  // ✅ Save user info
   await user.save({ validateBeforeSave: false });
 
-  // ✅ If user is HOST → update host-specific data
+  // ✅ Initialize host as null
+  let host = null;
+
+  // ✅ Update host-specific data if user is host
   if (user.role === "host") {
-    let host = await Host.findOne({ user: user._id });
+    host = await Host.findOne({ user: user._id });
     if (!host) return next(new ErrorHandler("Host profile not found", 404));
 
+    // Government ID & Number
     if (governmentID) host.governmentID = governmentID;
     if (governmentIDNumber) host.governmentIDNumber = governmentIDNumber;
 
-
-    // Handle Government ID Image upload (if provided)
-    if (req.files && req.files.governmentIDImage && req.files.governmentIDImage[0]) {
+    // Government ID image
+    if (req.files?.governmentIDImage?.[0]) {
       const govBuffer = req.files.governmentIDImage[0].buffer;
-
-      // Delete old ID image if exists
-      if (host.governmentIDImage?.public_id) {
+      if (host.governmentIDImage?.public_id)
         await cloudinary.uploader.destroy(host.governmentIDImage.public_id);
-      }
-
       const govResult = await streamUpload(govBuffer, "Verification");
-      host.governmentIDImage = {
-        public_id: govResult.public_id,
-        url: govResult.secure_url,
-      };
+      host.governmentIDImage = { public_id: govResult.public_id, url: govResult.secure_url };
     }
 
-    // ✅ Update Cancelled Cheque Image
+    // Cheque image
     if (req.files?.cancelledChequeImage?.[0]) {
       const chequeBuffer = req.files.cancelledChequeImage[0].buffer;
-      if (host.cancelledChequeImage?.public_id) await cloudinary.uploader.destroy(host.cancelledChequeImage.public_id);
+      if (host.cancelledChequeImage?.public_id)
+        await cloudinary.uploader.destroy(host.cancelledChequeImage.public_id);
       const chequeResult = await streamUpload(chequeBuffer, "cheque");
       host.cancelledChequeImage = { public_id: chequeResult.public_id, url: chequeResult.secure_url };
     }
 
+    // QR code
     if (req.files?.qrCode?.[0]) {
       const qrCodeBuffer = req.files.qrCode[0].buffer;
       if (host.qrCode?.public_id) await cloudinary.uploader.destroy(host.qrCode.public_id);
@@ -137,16 +115,33 @@ export const updateUserProfile = catchAsyncError(async (req, res, next) => {
       host.qrCode = { public_id: qrCodeResult.public_id, url: qrCodeResult.secure_url };
     }
 
-    if (bankDetails) host.bankDetails = bankDetails;
-    if (upiId) host.upiId = upiId;
+    // Bank details & payout
+    host.bankDetails = host.bankDetails || {};
+    host.payout = host.payout || {};
+
+    if (bankDetails) {
+      host.bankDetails.accountHolderName = bankDetails.accountHolderName || host.bankDetails.accountHolderName;
+      host.bankDetails.accountNumber = bankDetails.accountNumber || host.bankDetails.accountNumber;
+      host.bankDetails.bankName = bankDetails.bankName || host.bankDetails.bankName;
+      host.bankDetails.ifscCode = bankDetails.ifscCode || host.bankDetails.ifscCode;
+      host.bankDetails.branchName = bankDetails.branchName || host.bankDetails.branchName;
+
+      host.payout.bankDetails = { ...host.bankDetails };
+    }
+
+    if (upiId) {
+      host.upiId = upiId;
+      host.payout.upiId = upiId;
+    }
 
     await host.save({ validateBeforeSave: false });
   }
 
+  // ✅ Response
   res.status(200).json({
     success: true,
     message: "Profile updated successfully!",
     user,
-    host: user.role === "host" ? host : undefined,
+    host, // safe: null for non-host users
   });
 });
