@@ -30,7 +30,7 @@ const hostSchema = new mongoose.Schema(
 
     governmentID: {
       type: String,
-      enum: ["passport", "voter-id", "driving-license", "Aadhaar-card", "other"],
+      enum: ["passport","PAN", "voter-id", "driving-license", "Aadhaar-card", "other"],
       trim: true,
     },
     governmentIDNumber: { type: String, trim: true, maxlength: 100 },

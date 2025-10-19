@@ -52,6 +52,9 @@ export const updateUserProfile = catchAsyncError(async (req, res, next) => {
     location,
     governmentID,
     governmentIDNumber,
+    upiId,
+    qrCodeUrl,
+    bankDetails,
   } = req.body;
 
   const user = await User.findById(req.user._id);
@@ -103,6 +106,7 @@ export const updateUserProfile = catchAsyncError(async (req, res, next) => {
     if (governmentID) host.governmentID = governmentID;
     if (governmentIDNumber) host.governmentIDNumber = governmentIDNumber;
 
+
     // Handle Government ID Image upload (if provided)
     if (req.files && req.files.governmentIDImage && req.files.governmentIDImage[0]) {
       const govBuffer = req.files.governmentIDImage[0].buffer;
@@ -119,6 +123,24 @@ export const updateUserProfile = catchAsyncError(async (req, res, next) => {
       };
     }
 
+    // ✅ Update Cancelled Cheque Image
+    if (req.files?.cancelledChequeImage?.[0]) {
+      const chequeBuffer = req.files.cancelledChequeImage[0].buffer;
+      if (host.cancelledChequeImage?.public_id) await cloudinary.uploader.destroy(host.cancelledChequeImage.public_id);
+      const chequeResult = await streamUpload(chequeBuffer, "cheque");
+      host.cancelledChequeImage = { public_id: chequeResult.public_id, url: chequeResult.secure_url };
+    }
+
+    if(req.files?.qrCodeUrl?.[0]){
+      const qrCodeBuffer = req.files.qrCodeUrl[0].buffer;
+      if(host.qrCodeUrl) await cloudinary.uploader.destroy(host.qrCodeUrl);
+      const qrCodeResult = await streamUpload(qrCodeBuffer, "upi_qr");
+      host.qrCodeUrl = {public_id: qrCodeResult.public_id, url: qrCodeResult.secure_url};
+    }
+    
+    if(bankDetails)host.bankDetails = bankDetails;
+    if(upiId)host.upiId = upiId;
+    
     await host.save({ validateBeforeSave: false });
   }
 

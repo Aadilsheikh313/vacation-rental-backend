@@ -12,6 +12,8 @@ router.put(
   upload.fields([
     { name: "avatar", maxCount: 1 },
     { name: "governmentIDImage", maxCount: 1 },
+    { name: "cancelledChequeImage", maxCount: 1 },
+    { name: "qrCodeUrl", maxCount: 1 },
   ]),
   updateUserProfile
 );
