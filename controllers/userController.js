@@ -53,7 +53,6 @@ export const updateUserProfile = catchAsyncError(async (req, res, next) => {
     governmentID,
     governmentIDNumber,
     upiId,
-    qrCodeUrl,
     bankDetails,
   } = req.body;
 
@@ -131,16 +130,16 @@ export const updateUserProfile = catchAsyncError(async (req, res, next) => {
       host.cancelledChequeImage = { public_id: chequeResult.public_id, url: chequeResult.secure_url };
     }
 
-    if(req.files?.qrCodeUrl?.[0]){
-      const qrCodeBuffer = req.files.qrCodeUrl[0].buffer;
-      if(host.qrCodeUrl?.public_id) await cloudinary.uploader.destroy(host.qrCodeUrl.public_id);
+    if (req.files?.qrCode?.[0]) {
+      const qrCodeBuffer = req.files.qrCode[0].buffer;
+      if (host.qrCode?.public_id) await cloudinary.uploader.destroy(host.qrCode.public_id);
       const qrCodeResult = await streamUpload(qrCodeBuffer, "upi_qr");
-      host.qrCodeUrl = {public_id: qrCodeResult.public_id, url: qrCodeResult.secure_url};
+      host.qrCode = { public_id: qrCodeResult.public_id, url: qrCodeResult.secure_url };
     }
-    
-    if(bankDetails)host.bankDetails = bankDetails;
-    if(upiId)host.upiId = upiId;
-    
+
+    if (bankDetails) host.bankDetails = bankDetails;
+    if (upiId) host.upiId = upiId;
+
     await host.save({ validateBeforeSave: false });
   }
 
@@ -148,5 +147,6 @@ export const updateUserProfile = catchAsyncError(async (req, res, next) => {
     success: true,
     message: "Profile updated successfully!",
     user,
+    host: user.role === "host" ? host : undefined,
   });
 });

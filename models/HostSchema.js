@@ -44,7 +44,7 @@ const hostSchema = new mongoose.Schema(
       public_id: { type: String, required: false },
       url: { type: String, required: false },
     },
-    qrCodeUrl: {
+    qrCode: {
       public_id: { type: String, required: false },
       url: { type: String, required: false },
     },

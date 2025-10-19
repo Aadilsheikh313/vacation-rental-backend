@@ -47,7 +47,7 @@ export const register = catchAsyncError(async (req, res, next) => {
 
         let governmentIDImage = {};
         let cancelledChequeImage = {};
-        let qrCodeUrl = null;
+        let qrCode = null;
 
         // ✅ Helper Function to upload file buffer to Cloudinary
         const uploadToCloudinary = async (fileBuffer, folderName) => {
@@ -93,7 +93,7 @@ export const register = catchAsyncError(async (req, res, next) => {
                 files.qrCode[0].buffer,
                 "host_verifications/upi_qr"
             );
-            qrCodeUrl = {
+            qrCode= {
                 public_id: result.public_id,
                 url: result.secure_url,
             }
@@ -107,7 +107,7 @@ export const register = catchAsyncError(async (req, res, next) => {
             governmentIDNumber: governmentIDNumber || null,
             governmentIDImage: governmentIDImage,
             cancelledChequeImage: cancelledChequeImage,
-            qrCodeUrl: qrCodeUrl || null,
+            qrCode: qrCode|| null,
             payout: {
                 ...payout,
 
