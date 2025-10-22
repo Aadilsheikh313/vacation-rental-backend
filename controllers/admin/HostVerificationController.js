@@ -17,12 +17,12 @@ export const getAllPendingHosts = catchAsyncError(async (req, res, next) => {
     }
     // 2️⃣ Find all hosts whose verificationStatus is "pending"
     const pendingHosts = await Host.find({ verificationStatus: "pending" })
-        .populate('user', 'name email phone createdAt')
+        .populate('user', 'name email phone avatar gender dob bio location createdAt')
         .sort({ appliedAt: -1 }); // latest applied first
 
     // 3️⃣ if no pending hosts found
     if (!pendingHosts || pendingHosts.length === 0) {
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             message: "No pending hosts found.",
             totalPending: 0,
@@ -56,7 +56,7 @@ export const verifyOrRejectHost = catchAsyncError(async (req, res, next) => {
         return next(new ErrorHandler("Admin authentication required!", 401));
     }
 
-    const host = await Host.findById(hostId).populate('user', 'name email phone createdAt')
+    const host = await Host.findById(hostId).populate('user', 'name email phone avatar gender createdAt ')
     .sort({ appliedAt: -1 }); // latest applied first
 
     // ❌ Host existence check
