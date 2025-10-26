@@ -56,8 +56,7 @@ export const verifyOrRejectHost = catchAsyncError(async (req, res, next) => {
         return next(new ErrorHandler("Admin authentication required!", 401));
     }
 
-    const host = await Host.findById(hostId).populate('user', 'name email phone avatar gender createdAt ')
-    .sort({ appliedAt: -1 }); // latest applied first
+    const host = await Host.findById(hostId).populate('user', 'name email phone avatar gender createdAt ');
 
     // ❌ Host existence check
     if (!host) {
@@ -120,5 +119,68 @@ export const verifyOrRejectHost = catchAsyncError(async (req, res, next) => {
         success: true,
         message: `Host ${action === "verify" ? "verified" : "rejected"} successfully!`,
         host: sanitizedHost,
+    });
+});
+
+//========================Get all Verifed Host ======================
+export const GetAllVerifedHost = catchAsyncError(async (req, res, next) => {
+    const adminId = req.admin?._id;
+
+    if (!req.admin || req.admin.role !== "admin") {
+        return next(new ErrorHandler("Access denied! Admins only.", 403));
+    }
+
+    if (!adminId) {
+        return next(new ErrorHandler("Admin authentication required!", 401));
+    }
+
+    const verifedHosts = await Host.find({ verificationStatus: "verified" })
+        .populate('user', 'name email phone avatar gender dob bio location createdAt')
+        .sort({ appliedAt: -1 });
+
+    if (!verifedHosts || verifedHosts.length === 0) {
+        return res.status(200).json({
+            success: true,
+            message: "No verified hosts found.",
+            hosts: [],
+        });
+    }
+
+    res.status(200).json({
+        success: true,
+        message: "Verified hosts fetched successfully.",
+        totalVerified: verifedHosts.length,  
+        hosts: verifedHosts,
+    });
+});
+
+export const GetAllRejectHost = catchAsyncError(async (req, res, next) => {
+    const adminId = req.admin?._id;
+
+    if (!req.admin || req.admin.role !== "admin") {
+        return next(new ErrorHandler("Access denied! Admins only.", 403));
+    }
+
+    if (!adminId) {
+        return next(new ErrorHandler("Admin authentication required!", 401));
+    }
+
+    const rejectHosts = await Host.find({ verificationStatus: "rejected" })
+        .populate('user', 'name email phone avatar gender dob bio location createdAt')
+        .sort({ appliedAt: -1 });
+
+    if (!rejectHosts || rejectHosts.length === 0) {
+        return res.status(200).json({
+            success: true,
+            message: "No rejected hosts found.",
+            hosts: [],
+        });
+    }
+
+    res.status(200).json({
+        success: true,
+        message: "Rejected hosts fetched successfully.",  
+        totalRejected: rejectHosts.length,                
+        hosts: rejectHosts,
     });
 });
