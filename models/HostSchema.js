@@ -30,7 +30,7 @@ const hostSchema = new mongoose.Schema(
 
     governmentID: {
       type: String,
-      enum: ["passport", "PAN", "voter-id", "driving-license", "Aadhaar-card", "other"],
+      enum: ["passport", "PAN", "voter-id", "driving-license", "Aadhaar", "Aadhaar-card", "other"],
       trim: true,
     },
     governmentIDNumber: { type: String, trim: true, maxlength: 100 },
@@ -97,9 +97,15 @@ const hostSchema = new mongoose.Schema(
         performedBy: { type: mongoose.Schema.Types.ObjectId, refPath: "audit.performedByModel" },
         performedByModel: { type: String, enum: ["Admin", "User"] },
         note: { type: String, trim: true, maxlength: 500 },
+        adminDetails: {
+          name: { type: String, trim: true },
+          email: { type: String, trim: true },
+          phone: { type: String, trim: true },
+        },
         date: { type: Date, default: Date.now },
       },
     ],
+
   },
   { timestamps: true }
 );

@@ -12,9 +12,9 @@ import {
 const router = express.Router();
 
 router.get('/pending-hosts', isAuthorized, isAdmin, getAllPendingHosts);
-router.put('/verify-reject-host/:hostId', isAuthorized, isAdmin, verifyOrRejectHost);
 router.get('/verified-hosts', isAuthorized, isAdmin, GetAllVerifedHost);
 router.get('/rejected-hosts', isAuthorized, isAdmin, GetAllRejectHost);
+router.put('/verify-reject-host/:hostId', isAuthorized, isAdmin, verifyOrRejectHost);
 
 
 export default router;
