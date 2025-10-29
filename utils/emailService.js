@@ -6,3 +6,4 @@ const sendEmail = ({ to, subject, text }) => {
 };
 
 export default sendEmail;
+

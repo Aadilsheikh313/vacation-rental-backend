@@ -46,35 +46,38 @@ export const getAllPendingHosts = catchAsyncError(async (req, res, next) => {
 
 //========================Get all Verifed Host ======================
 export const GetAllVerifedHost = catchAsyncError(async (req, res, next) => {
-    const adminId = req.admin?._id;
+  const adminId = req.admin?._id;
 
-    if (!req.admin || req.admin.role !== "admin") {
-        return next(new ErrorHandler("Access denied! Admins only.", 403));
-    }
+  if (!req.admin || req.admin.role !== "admin") {
+    return next(new ErrorHandler("Access denied! Admins only.", 403));
+  }
 
-    if (!adminId) {
-        return next(new ErrorHandler("Admin authentication required!", 401));
-    }
+  if (!adminId) {
+    return next(new ErrorHandler("Admin authentication required!", 401));
+  }
 
-    const verifedHosts = await Host.find({ verificationStatus: "verified" })
-        .populate('user', 'name email phone avatar gender dob bio location createdAt')
-        .sort({ appliedAt: -1 });
+  const verifedHosts = await Host.find({
+    verificationStatus: { $in: ["verified", "reverified"] },
+  })
+    .populate("user", "name email phone avatar gender dob bio location createdAt")
+    .sort({ appliedAt: -1 });
 
-    if (!verifedHosts || verifedHosts.length === 0) {
-        return res.status(200).json({
-            success: true,
-            message: "No verified hosts found.",
-            hosts: [],
-        });
-    }
-
-    res.status(200).json({
-        success: true,
-        message: "Verified hosts fetched successfully.",
-        totalVerified: verifedHosts.length,
-        hosts: verifedHosts,
+  if (!verifedHosts || verifedHosts.length === 0) {
+    return res.status(200).json({
+      success: true,
+      message: "No verified or reverified hosts found.",
+      hosts: [],
     });
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Verified and reverified hosts fetched successfully.",
+    totalVerified: verifedHosts.length,
+    hosts: verifedHosts,
+  });
 });
+
 
 export const GetAllRejectHost = catchAsyncError(async (req, res, next) => {
     const adminId = req.admin?._id;
@@ -213,14 +216,17 @@ export const verifyOrRejectHost = catchAsyncError(async (req, res, next) => {
 
 export const ReVerification = catchAsyncError(async (req, res, next) => {
     const { hostId } = req.params;
-    const { note } = req.body;
-
+    const {action, note } = req.body;
+  console.log("HOST ID", hostId);
+  
     // 1️⃣ Check admin authentication
     if (!req.admin || req.admin.role !== "admin") {
         return next(new ErrorHandler("Access denied! Admins only.", 403));
     }
 
     const adminId = req.admin?._id;
+    console.log("AdminID", adminId);
+    
     if (!adminId) {
         return next(new ErrorHandler("Admin authentication required!", 401));
     }
@@ -250,7 +256,7 @@ export const ReVerification = catchAsyncError(async (req, res, next) => {
     }
 
     // 6️⃣ Update verification status
-    host.verificationStatus = "verified";
+    host.verificationStatus = "reverified";
     host.verifiedAt = Date.now();
     host.rejectedAt = null;
     host.rejectedReason = null;

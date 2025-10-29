@@ -11,7 +11,7 @@ const hostSchema = new mongoose.Schema(
 
     verificationStatus: {
       type: String,
-      enum: ["pending", "verified", "rejected"],
+      enum: ["pending", "verified", "rejected", "reverified"],
       default: "pending",
     },
 
@@ -93,7 +93,7 @@ const hostSchema = new mongoose.Schema(
 
     audit: [
       {
-        action: { type: String, enum: ["applied", "verified", "rejected", "banned", "unbanned"], required: true },
+        action: { type: String, enum: ["applied", "verified", "rejected","reverified", "banned", "unbanned"], required: true },
         performedBy: { type: mongoose.Schema.Types.ObjectId, refPath: "audit.performedByModel" },
         performedByModel: { type: String, enum: ["Admin", "User"] },
         note: { type: String, trim: true, maxlength: 500 },
