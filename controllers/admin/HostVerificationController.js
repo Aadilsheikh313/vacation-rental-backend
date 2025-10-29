@@ -209,3 +209,77 @@ export const verifyOrRejectHost = catchAsyncError(async (req, res, next) => {
         host: sanitizedHost,
     });
 });
+
+
+export const ReVerification = catchAsyncError(async (req, res, next) => {
+    const { hostId } = req.params;
+    const { note } = req.body;
+
+    // 1️⃣ Check admin authentication
+    if (!req.admin || req.admin.role !== "admin") {
+        return next(new ErrorHandler("Access denied! Admins only.", 403));
+    }
+
+    const adminId = req.admin?._id;
+    if (!adminId) {
+        return next(new ErrorHandler("Admin authentication required!", 401));
+    }
+
+    // 2️⃣ Find host
+    const host = await Host.findById(hostId).populate("user", "name email phone avatar");
+    if (!host) {
+        return next(new ErrorHandler("Host not found!", 404));
+    }
+
+    // 3️⃣ Check if host was previously rejected
+    if (host.verificationStatus !== "rejected") {
+        return next(new ErrorHandler("This host is not rejected, so it cannot be reverified.", 400));
+    }
+
+    // 4️⃣ Find who rejected it from audit log
+    const rejectedAudit = host.audit.find(a => a.action === "rejected");
+    if (!rejectedAudit) {
+        return next(new ErrorHandler("Rejection record not found in audit log.", 400));
+    }
+
+    const rejectedByAdminId = rejectedAudit.performedBy.toString();
+
+    // 5️⃣ Ensure same admin re-verifies
+    if (rejectedByAdminId !== adminId.toString()) {
+        return next(new ErrorHandler("Access denied! Only the admin who rejected can reverify this host.", 403));
+    }
+
+    // 6️⃣ Update verification status
+    host.verificationStatus = "verified";
+    host.verifiedAt = Date.now();
+    host.rejectedAt = null;
+    host.rejectedReason = null;
+
+    // 7️⃣ Add new audit log entry for re-verification
+    host.audit.push({
+        action: "reverified",
+        performedBy: adminId,
+        performedByModel: "Admin",
+        note: note || "Host reverified by same admin after review.",
+        adminDetails: {
+            name: req.admin.name,
+            email: req.admin.email,
+            phone: req.admin.phone
+        },
+        date: Date.now(),
+    });
+
+    await host.save();
+
+    // 8️⃣ Return response with previous rejection info
+    res.status(200).json({
+        success: true,
+        message: "Host reverified successfully by the same admin.",
+        host,
+        previousRejection: {
+            rejectedBy: rejectedAudit.adminDetails,
+            rejectedDate: rejectedAudit.date,
+            rejectedNote: rejectedAudit.note,
+        }
+    });
+});
