@@ -33,32 +33,43 @@ export const getAdminAllHosts = catchAsyncError(async (req, res, next) => {
 
   // 3️⃣ Attach Properties for Each Host
   const enrichedHosts = await Promise.all(
-    verifiedHosts.map(async (host) => {
-      const properties = await Property.find({ userId: host.user._id }).select(
-        "title location price image.url propertyPostedOn expired"
-      );
-
+  verifiedHosts.map(async (host) => {
+    if (!host.user) {
       return {
         hostId: host._id,
         verificationStatus: host.verificationStatus,
         appliedAt: host.appliedAt,
-        user: {
-          _id: host.user._id,
-          name: host.user.name,
-          email: host.user.email,
-          phone: host.user.phone,
-          avatar: host.user.avatar,
-          gender: host.user.gender,
-          dob: host.user.dob,
-          bio: host.user.bio,
-          location: host.user.location,
-          createdAt: host.user.createdAt,
-        },
-        propertyCount: properties.length,
-        properties,
+        user: null,
+        propertyCount: 0,
+        properties: [],
       };
-    })
-  );
+    }
+
+    const properties = await Property.find({ userId: host.user._id }).select(
+      "title location price image.url propertyPostedOn expired"
+    );
+
+    return {
+      hostId: host._id,
+      verificationStatus: host.verificationStatus,
+      appliedAt: host.appliedAt,
+      user: {
+        _id: host.user._id,
+        name: host.user.name,
+        email: host.user.email,
+        phone: host.user.phone,
+        avatar: host.user.avatar,
+        gender: host.user.gender,
+        dob: host.user.dob,
+        bio: host.user.bio,
+        location: host.user.location,
+        createdAt: host.user.createdAt,
+      },
+      propertyCount: properties.length,
+      properties,
+    };
+  })
+);
 
   // 4️⃣ Final Response
   res.status(200).json({
