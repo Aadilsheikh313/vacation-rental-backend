@@ -8,13 +8,11 @@ import {
     getAdminBannedHosts,
     getAdminLogoutHosts,
     getAdminNewRegisterHosts,
-    getTotalHosts
 } from "../../controllers/admin/AdminHostController.js";
 
 const router = express.Router();
 
 // 🛡️ Protected route - only admin can access
-router.get("/admin/total-hosts", isAuthorized, isAdmin, getTotalHosts);
 router.get("/admin/all-hosts", isAuthorized, isAdmin, getAdminAllHosts);
 router.get("/admin/active-hosts", isAuthorized, isAdmin, getAdminAllActiveHosts);
 router.get("/admin/online-hosts", isAuthorized, isAdmin, getAdminAllOnlineHosts);

@@ -1,51 +1,74 @@
 import { catchAsyncError } from "../../middlewares/catchAsyncError.js";
+import ErrorHandler from "../../middlewares/errorMiddleware.js";
 import { User } from "../../models/User.js";
-import {Property} from "../../models/Property.js"
-
-// ================= Get Total Hosts Controller function =================
-export const getTotalHosts = catchAsyncError(async(req, res, next) =>{
-    const totalHosts = await User.countDocuments({
-        role: {$in :["host", "Host"]}
-    });
-
-     res.status(200).json({
-        success: true,
-        totalHosts,
-        message: `Total  Hosts: ${totalHosts}`
-    });
-});
-
+import { Property } from "../../models/Property.js";
+import { Host } from "../../models/HostSchema.js";
 
 export const getAdminAllHosts = catchAsyncError(async (req, res, next) => {
-  // 1️⃣ Get all users with role "host"
-  const hosts = await User.find({ role: { $in: ["host", "Host"] } }).select("-password");
+  const adminId = req.admin?._id;
 
-  // 2️⃣ Attach properties to each host
+  // 1️⃣ Admin Authentication Check
+  if (!req.admin || req.admin.role !== "admin") {
+    return next(new ErrorHandler("Access denied! Admins only.", 403));
+  }
+
+  if (!adminId) {
+    return next(new ErrorHandler("Admin authentication required!", 401));
+  }
+
+  // 2️⃣ Fetch Verified or Reverified Hosts
+  const verifiedHosts = await Host.find({
+    verificationStatus: { $in: ["verified", "reverified"] },
+  })
+    .populate("user", "name email phone avatar gender dob bio location createdAt")
+    .sort({ appliedAt: -1 });
+
+  if (!verifiedHosts || verifiedHosts.length === 0) {
+    return res.status(200).json({
+      success: true,
+      message: "No verified or reverified hosts found.",
+      hosts: [],
+    });
+  }
+
+  // 3️⃣ Attach Properties for Each Host
   const enrichedHosts = await Promise.all(
-    hosts.map(async (host) => {
-      const properties = await Property.find({ userId: host._id })
-        .select("title location price image.url propertyPostedOn expired");
+    verifiedHosts.map(async (host) => {
+      const properties = await Property.find({ userId: host.user._id }).select(
+        "title location price image.url propertyPostedOn expired"
+      );
 
       return {
-        _id: host._id,
-        name: host.name,
-        email: host.email,
-        phone: host.phone,
-        isBanned: host.isBanned,
-        lastLogin: host.lastLogin,
-        lastActiveAt: host.lastActiveAt,
-        createdAt: host.createdAt,
+        hostId: host._id,
+        verificationStatus: host.verificationStatus,
+        appliedAt: host.appliedAt,
+        user: {
+          _id: host.user._id,
+          name: host.user.name,
+          email: host.user.email,
+          phone: host.user.phone,
+          avatar: host.user.avatar,
+          gender: host.user.gender,
+          dob: host.user.dob,
+          bio: host.user.bio,
+          location: host.user.location,
+          createdAt: host.user.createdAt,
+        },
         propertyCount: properties.length,
         properties,
       };
     })
   );
 
+  // 4️⃣ Final Response
   res.status(200).json({
     success: true,
+    message: "Verified and reverified hosts fetched successfully.",
+    totalVerified: verifiedHosts.length,
     hosts: enrichedHosts,
   });
 });
+
 
 export const getAdminAllActiveHosts = catchAsyncError(async (req, res, next) => {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
