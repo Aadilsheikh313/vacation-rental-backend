@@ -5,6 +5,7 @@ import {
     getAllPendingHosts,
     GetAllRejectHost,
     GetAllVerifedHost,
+    GetUserProfile,
     ReVerification,
     verifyOrRejectHost
 } from '../../controllers/admin/HostVerificationController.js';
@@ -17,6 +18,7 @@ router.get('/verified-hosts', isAuthorized, isAdmin, GetAllVerifedHost);
 router.get('/rejected-hosts', isAuthorized, isAdmin, GetAllRejectHost);
 router.put('/verify-reject-host/:hostId', isAuthorized, isAdmin, verifyOrRejectHost);
 router.put('/reverify-host/:hostId', isAuthorized, isAdmin, ReVerification);
+router.get('/Profile/:userId' , isAuthorized, isAdmin, GetUserProfile);
 
 
 export default router;

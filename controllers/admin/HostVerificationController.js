@@ -1,6 +1,7 @@
 import { catchAsyncError } from "../../middlewares/catchAsyncError.js";
 import ErrorHandler from "../../middlewares/errorMiddleware.js";
 import { Host } from "../../models/HostSchema.js";
+import { User } from "../../models/User.js";
 import { Admin } from "../../models/admin.js";
 
 
@@ -38,7 +39,6 @@ export const getAllPendingHosts = catchAsyncError(async (req, res, next) => {
         totalPending: pendingHosts.length,
         hosts: pendingHosts,
     });
-
 
 });
 
@@ -217,7 +217,6 @@ export const verifyOrRejectHost = catchAsyncError(async (req, res, next) => {
 export const ReVerification = catchAsyncError(async (req, res, next) => {
     const { hostId } = req.params;
     const {action, note } = req.body;
-  console.log("HOST ID", hostId);
   
     // 1️⃣ Check admin authentication
     if (!req.admin || req.admin.role !== "admin") {
@@ -288,4 +287,69 @@ export const ReVerification = catchAsyncError(async (req, res, next) => {
             rejectedNote: rejectedAudit.note,
         }
     });
+});
+
+
+// ============================== Get User Profile (for Admin) ==============================
+
+export const GetUserProfile = catchAsyncError(async (req, res, next) => {
+  const { userId } = req.params;
+
+  // 🔐 1️⃣ Check if Admin is authenticated
+  if (!req.admin || req.admin.role !== "admin") {
+    return next(new ErrorHandler("Access denied! Admins only.", 403));
+  }
+
+  const adminId = req.admin?._id;
+  if (!adminId) {
+    return next(new ErrorHandler("Admin authentication required!", 401));
+  }
+
+  // 🧭 2️⃣ Find user basic details
+  const user = await User.findById(userId).select(
+    "name email phone role avatar bio dob gender location isBanned banReason bannedAt unbannedAt createdAt updatedAt"
+  );
+
+  if (!user) {
+    return next(new ErrorHandler("User not found!", 404));
+  }
+
+  // 🏠 3️⃣ If user is a host, include Host details
+  if (user.role === "host") {
+    const host = await Host.findOne({ user: userId }).select(
+      "verificationStatus verifiedAt rejectedAt rejectedReason adminNote governmentID governmentIDNumber governmentIDImage payout earnings rating"
+    );
+
+    // ✅ Response for Host
+    return res.status(200).json({
+      success: true,
+      message: "Host profile fetched successfully.",
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        avatar: user.avatar,
+        bio: user.bio,
+        dob: user.dob,
+        gender: user.gender,
+        location: user.location,
+        isBanned: user.isBanned,
+        banReason: user.banReason,
+        bannedAt: user.bannedAt,
+        unbannedAt: user.unbannedAt,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
+      hostDetails: host || null, // HostSchema ka data (if found)
+    });
+  }
+
+  // 👤 4️⃣ If user is a guest
+  res.status(200).json({
+    success: true,
+    message: "Guest profile fetched successfully.",
+    user,
+  });
 });

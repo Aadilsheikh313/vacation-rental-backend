@@ -33,43 +33,43 @@ export const getAdminAllHosts = catchAsyncError(async (req, res, next) => {
 
   // 3️⃣ Attach Properties for Each Host
   const enrichedHosts = await Promise.all(
-  verifiedHosts.map(async (host) => {
-    if (!host.user) {
+    verifiedHosts.map(async (host) => {
+      if (!host.user) {
+        return {
+          hostId: host._id,
+          verificationStatus: host.verificationStatus,
+          appliedAt: host.appliedAt,
+          user: null,
+          propertyCount: 0,
+          properties: [],
+        };
+      }
+
+      const properties = await Property.find({ userId: host.user._id }).select(
+        "title location price image.url propertyPostedOn expired"
+      );
+
       return {
         hostId: host._id,
         verificationStatus: host.verificationStatus,
         appliedAt: host.appliedAt,
-        user: null,
-        propertyCount: 0,
-        properties: [],
+        user: {
+          _id: host.user._id,
+          name: host.user.name,
+          email: host.user.email,
+          phone: host.user.phone,
+          avatar: host.user.avatar,
+          gender: host.user.gender,
+          dob: host.user.dob,
+          bio: host.user.bio,
+          location: host.user.location,
+          createdAt: host.user.createdAt,
+        },
+        propertyCount: properties.length,
+        properties,
       };
-    }
-
-    const properties = await Property.find({ userId: host.user._id }).select(
-      "title location price image.url propertyPostedOn expired"
-    );
-
-    return {
-      hostId: host._id,
-      verificationStatus: host.verificationStatus,
-      appliedAt: host.appliedAt,
-      user: {
-        _id: host.user._id,
-        name: host.user.name,
-        email: host.user.email,
-        phone: host.user.phone,
-        avatar: host.user.avatar,
-        gender: host.user.gender,
-        dob: host.user.dob,
-        bio: host.user.bio,
-        location: host.user.location,
-        createdAt: host.user.createdAt,
-      },
-      propertyCount: properties.length,
-      properties,
-    };
-  })
-);
+    })
+  );
 
   // 4️⃣ Final Response
   res.status(200).json({
@@ -82,80 +82,80 @@ export const getAdminAllHosts = catchAsyncError(async (req, res, next) => {
 
 
 export const getAdminAllActiveHosts = catchAsyncError(async (req, res, next) => {
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
 
-    const activeHosts = await User.find({
-        role: { $in: ["host", "Host"] },
-        lastActiveAt: { $gte: sevenDaysAgo }
-    }).select("-password").lean();
+  const activeHosts = await User.find({
+    role: { $in: ["host", "Host"] },
+    lastActiveAt: { $gte: sevenDaysAgo }
+  }).select("-password").lean();
 
-    const enrichedHosts = await Promise.all(
-        activeHosts.map(async (host) => {
-            const properties = await Property.find({ userId: host._id })
-                .select("title location price image.url propertyPostedOn expired");
+  const enrichedHosts = await Promise.all(
+    activeHosts.map(async (host) => {
+      const properties = await Property.find({ userId: host._id })
+        .select("title location price image.url propertyPostedOn expired");
 
-            return {
-                _id: host._id,
-                name: host.name,
-                email: host.email,
-                phone: host.phone,
-                isBanned: host.isBanned,
-                lastLogin: host.lastLogin,
-                lastActiveAt: host.lastActiveAt,
-                createdAt: host.createdAt,
-                propertyCount: properties.length,
-                properties,
-            };
-        })
-    );
+      return {
+        _id: host._id,
+        name: host.name,
+        email: host.email,
+        phone: host.phone,
+        isBanned: host.isBanned,
+        lastLogin: host.lastLogin,
+        lastActiveAt: host.lastActiveAt,
+        createdAt: host.createdAt,
+        propertyCount: properties.length,
+        properties,
+      };
+    })
+  );
 
-    res.status(200).json({
-        success: true,
-        count: enrichedHosts.length,
-        hosts: enrichedHosts,
-        message: `${enrichedHosts.length} hosts active in last 7 days.`
-    });
+  res.status(200).json({
+    success: true,
+    count: enrichedHosts.length,
+    hosts: enrichedHosts,
+    message: `${enrichedHosts.length} hosts active in last 7 days.`
+  });
 });
 
 
 export const getAdminAllOnlineHosts = catchAsyncError(async (req, res, next) => {
-    // Define 15 minutes ago timestamp
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+  // Define 15 minutes ago timestamp
+  const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
 
-    // Fetch all online hosts
-    const onlineHosts = await User.find({
-        role: { $in: ["host", "Host"] },
-        lastActiveAt: { $gte: fifteenMinutesAgo },
-        isBanned: false // Optional: only include non-banned hosts
-    }).select("-password").lean();
+  // Fetch all online hosts
+  const onlineHosts = await User.find({
+    role: { $in: ["host", "Host"] },
+    lastActiveAt: { $gte: fifteenMinutesAgo },
+    isBanned: false // Optional: only include non-banned hosts
+  }).select("-password").lean();
 
-    // Enrich with property details
-    const enrichedHosts = await Promise.all(
-        onlineHosts.map(async (host) => {
-            const properties = await Property.find({ userId: host._id })
-                .select("title location price image.url propertyPostedOn expired");
+  // Enrich with property details
+  const enrichedHosts = await Promise.all(
+    onlineHosts.map(async (host) => {
+      const properties = await Property.find({ userId: host._id })
+        .select("title location price image.url propertyPostedOn expired");
 
-            return {
-                _id: host._id,
-                name: host.name,
-                email: host.email,
-                phone: host.phone,
-                isBanned: host.isBanned,
-                lastLogin: host.lastLogin,
-                lastActiveAt: host.lastActiveAt,
-                createdAt: host.createdAt,
-                propertyCount: properties.length,
-                properties,
-            };
-        })
-    );
+      return {
+        _id: host._id,
+        name: host.name,
+        email: host.email,
+        phone: host.phone,
+        isBanned: host.isBanned,
+        lastLogin: host.lastLogin,
+        lastActiveAt: host.lastActiveAt,
+        createdAt: host.createdAt,
+        propertyCount: properties.length,
+        properties,
+      };
+    })
+  );
 
-    res.status(200).json({
-        success: true,
-        count: enrichedHosts.length,
-        hosts: enrichedHosts,
-        message: `${enrichedHosts.length} host(s) online in the last 15 minutes.`
-    });
+  res.status(200).json({
+    success: true,
+    count: enrichedHosts.length,
+    hosts: enrichedHosts,
+    message: `${enrichedHosts.length} host(s) online in the last 15 minutes.`
+  });
 });
 
 
