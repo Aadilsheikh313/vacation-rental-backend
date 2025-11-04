@@ -7,7 +7,7 @@ import { Host } from "../../models/HostSchema.js";
 export const getAdminAllHosts = catchAsyncError(async (req, res, next) => {
   const adminId = req.admin?._id;
 
-  // 1️⃣ Admin Authentication Check
+  // 1️⃣ Authorization check
   if (!req.admin || req.admin.role !== "admin") {
     return next(new ErrorHandler("Access denied! Admins only.", 403));
   }
@@ -16,62 +16,68 @@ export const getAdminAllHosts = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler("Admin authentication required!", 401));
   }
 
-  // 2️⃣ Fetch Verified or Reverified Hosts
+  // 2️⃣ Fetch Verified + Reverified Hosts
   const verifiedHosts = await Host.find({
     verificationStatus: { $in: ["verified", "reverified"] },
   })
     .populate("user", "name email phone avatar gender dob bio location createdAt")
+    .select(
+      "verificationStatus appliedAt lastUpdatedAt audit governmentID governmentIDNumber adminNote verifiedAt rejectedAt rejectedReason"
+    )
     .sort({ appliedAt: -1 });
 
+  // 3️⃣ Handle No Hosts Found
   if (!verifiedHosts || verifiedHosts.length === 0) {
     return res.status(200).json({
       success: true,
       message: "No verified or reverified hosts found.",
+      totalVerified: 0,
       hosts: [],
     });
   }
 
-  // 3️⃣ Attach Properties for Each Host
+  // 4️⃣ Enrich with Property Data
   const enrichedHosts = await Promise.all(
     verifiedHosts.map(async (host) => {
-      if (!host.user) {
-        return {
-          hostId: host._id,
-          verificationStatus: host.verificationStatus,
-          appliedAt: host.appliedAt,
-          user: null,
-          propertyCount: 0,
-          properties: [],
-        };
-      }
+      const userData = host.user
+        ? {
+            _id: host.user._id,
+            name: host.user.name,
+            email: host.user.email,
+            phone: host.user.phone,
+            avatar: host.user.avatar,
+            gender: host.user.gender,
+            dob: host.user.dob,
+            bio: host.user.bio,
+            location: host.user.location,
+            createdAt: host.user.createdAt,
+          }
+        : null;
 
-      const properties = await Property.find({ userId: host.user._id }).select(
+      const properties = await Property.find({ userId: host.user?._id }).select(
         "title location price image.url propertyPostedOn expired"
       );
 
       return {
         hostId: host._id,
         verificationStatus: host.verificationStatus,
+        governmentID: host.governmentID,
+        governmentIDNumber: host.governmentIDNumber,
+        adminNote: host.adminNote,
+        verifiedAt: host.verifiedAt,
+        rejectedAt: host.rejectedAt,
+        rejectedReason: host.rejectedReason,
         appliedAt: host.appliedAt,
-        user: {
-          _id: host.user._id,
-          name: host.user.name,
-          email: host.user.email,
-          phone: host.user.phone,
-          avatar: host.user.avatar,
-          gender: host.user.gender,
-          dob: host.user.dob,
-          bio: host.user.bio,
-          location: host.user.location,
-          createdAt: host.user.createdAt,
-        },
+        lastUpdatedAt: host.lastUpdatedAt,
+        audit: host.audit || [], // ✅ Full audit array
+        user: userData,
         propertyCount: properties.length,
         properties,
       };
     })
   );
 
-  // 4️⃣ Final Response
+  // 5️⃣ Final Clean Response
   res.status(200).json({
     success: true,
     message: "Verified and reverified hosts fetched successfully.",
@@ -79,6 +85,7 @@ export const getAdminAllHosts = catchAsyncError(async (req, res, next) => {
     hosts: enrichedHosts,
   });
 });
+
 
 
 export const getAdminAllActiveHosts = catchAsyncError(async (req, res, next) => {

@@ -291,7 +291,6 @@ export const ReVerification = catchAsyncError(async (req, res, next) => {
 
 
 // ============================== Get User Profile (for Admin) ==============================
-
 export const GetUserProfile = catchAsyncError(async (req, res, next) => {
   const { userId } = req.params;
 
@@ -317,7 +316,7 @@ export const GetUserProfile = catchAsyncError(async (req, res, next) => {
   // 🏠 3️⃣ If user is a host, include Host details
   if (user.role === "host") {
     const host = await Host.findOne({ user: userId }).select(
-      "verificationStatus verifiedAt rejectedAt rejectedReason adminNote governmentID governmentIDNumber governmentIDImage payout earnings rating"
+      "verificationStatus verifiedAt rejectedAt rejectedReason adminNote governmentID governmentIDNumber cancelledChequeImage governmentIDImage payout earnings rating"
     );
 
     // ✅ Response for Host
