@@ -83,15 +83,26 @@ export const postProperty = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler("Host profile not found. Please complete your host profile.", 404));
   }
 
-  if (host.verificationStatus !== "verified") {
-    return next(new ErrorHandler("Your host profile is not verified yet. Please wait for admin approval before posting a property.",
-      403));
+  // Allow both verified and reverified hosts
+  if (host.verificationStatus === "pending") {
+    return next(
+      new ErrorHandler("Your host profile is under review. Please wait for admin approval before posting a property.", 403)
+    );
   }
 
-  if (host.verificationStatus !== "rejected") {
-    return next(new ErrorHandler("Your host verification was rejected. Please update your documents or profile details and resubmit for admin approval.",
-      403));
+  if (host.verificationStatus === "rejected") {
+    return next(
+      new ErrorHandler("Your host verification was rejected. Please update your documents or profile details and resubmit for admin approval.", 403)
+    );
   }
+
+  // ✅ Only verified or reverified hosts can continue
+  if (!["verified", "reverified"].includes(host.verificationStatus)) {
+    return next(
+      new ErrorHandler("Invalid host verification status. Please contact admin.", 403)
+    );
+  }
+
   let {
     title,
     description,
