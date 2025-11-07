@@ -7,8 +7,8 @@ import { PropertysLog } from "../../models/PropertyLog.js";
 export const inActiveProperty = catchAsyncError(async (req, res, next) => {
   const { propertyId } = req.params;
   const { reason } = req.body;
-  const adminId = req.user._id;
-
+  const adminId = req.admin?._id;
+  
   if (!reason || reason.trim().length < 5) {
     return next(new ErrorHandler("Reason must be at least 5 characters long", 400));
   }
@@ -44,7 +44,7 @@ export const inActiveProperty = catchAsyncError(async (req, res, next) => {
 export const activeProperty = catchAsyncError(async (req, res, next) => {
   const { propertyId } = req.params;
   const { note } = req.body;
-  const adminId = req.user._id;
+  const adminId = req.admin?._id;
 
   if (!note || note.trim().length < 5) {
     return next(new ErrorHandler("Activation note must be at least 5 characters long", 400));
