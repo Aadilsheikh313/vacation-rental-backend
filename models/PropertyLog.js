@@ -2,6 +2,11 @@ import mongoose from "mongoose";
 
 const PropertylogSchema = new mongoose.Schema(
   {
+    propertyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Property", // ✅ Link log directly to a Property
+      required: true,
+    },
     action: {
       type: String,
       enum: ["Active", "inActive"],
@@ -9,12 +14,12 @@ const PropertylogSchema = new mongoose.Schema(
     },
     performedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Admin", // ✅ Corrected from "User" to "Admin"
+      ref: "Admin", // ✅ Admin who performed the action
       required: true,
     },
     targetUser: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "User", // ✅ Property owner (host)
       required: true,
     },
     reason: {
@@ -29,7 +34,7 @@ const PropertylogSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true, // ✅ createdAt and updatedAt fields
+    timestamps: true, // ✅ Adds createdAt & updatedAt
   }
 );
 
