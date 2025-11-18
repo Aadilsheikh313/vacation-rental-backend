@@ -2,118 +2,137 @@ import { catchAsyncError } from "../middlewares/catchAsyncError.js";
 import ErrorHandler from "../middlewares/errorMiddleware.js";
 import { Booking } from "../models/Booking.js";
 import { Property } from "../models/Property.js";
-import { Review } from "../models/Review.js"
 import mongoose from "mongoose";
-import sendEmail from "../utils/emailService.js";
 
-
-// Get all bookings for logged-in user
+// ⭐ 1) Get all bookings of logged-in user
 export const getBookingProperty = catchAsyncError(async (req, res, next) => {
-  const bookings = await Booking.find({ guest: req.user._id })
-
+  const bookings = await Booking.find({ user: req.user._id })
     .populate({
       path: "property",
       select: "title image city userId",
-      populate: {
-        path: "userId",
-        select: "name email phone"
-      }
+      populate: { path: "userId", select: "name email phone" },
     })
     .sort({ createdAt: -1 });
 
-
-  res.status(200).json({
-    success: true,
-    bookings,
-  });
+  res.status(200).json({ success: true, bookings });
 });
 
+// ⭐ 2) Create Temporary Booking (Before Payment)
+export const createTempBooking = catchAsyncError(async (req, res, next) => {
+  const { propertyId, checkIn, checkOut, guests, serviceFee = 0, totalAmount } = req.body;
 
-export const postBookingProperty = catchAsyncError(async (req, res, next) => {
-  const {
-    checkIn,
-    checkOut,
-    guests,
-    serviceFee: clientServiceFee = 0,
-    paymentMethod,
-    discountAmount = 0,
-    couponCode = null,
-  } = req.body;
-
-  const propertyId = req.params.propertyId;
-
-  // ✅ Basic validation
-  if (!checkIn || !checkOut || !guests || !paymentMethod) {
-    return next(new ErrorHandler("All booking fields are required", 400));
+  if (!propertyId || !checkIn || !checkOut || !totalAmount) {
+    return next(new ErrorHandler("propertyId, checkIn, checkOut and totalAmount are required", 400));
   }
-  if (!Number.isInteger(guests.adults) || guests.adults < 1) {
-    return next(new ErrorHandler("At least one adult is required", 400));
-  }
-
-  // ✅ Parse dates
-  const checkInDate = new Date(checkIn);
-  const checkOutDate = new Date(checkOut);
-  checkOutDate.setHours(0, 0, 0, 0);
-  if (isNaN(checkInDate) || isNaN(checkOutDate)) {
-    return next(new ErrorHandler("Invalid check-in or check-out date", 400));
-  }
-  // Normalize both dates (set time to midnight)
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  checkInDate.setHours(0, 0, 0, 0);
-
-  if (checkInDate < today) {
-    return next(new ErrorHandler("Check-in date cannot be in the past.", 400));
-  }
-
 
   const property = await Property.findById(propertyId);
   if (!property) return next(new ErrorHandler("Property not found", 404));
 
-  // ❌ Hosts cannot book
+  // ❌ Prevent host from booking own properties
   if (req.user?.role?.toLowerCase() === "host") {
     return next(new ErrorHandler("Hosts are not allowed to book properties", 403));
   }
 
-  // ✅ Calculate number of nights
-  const msInDay = 1000 * 60 * 60 * 24;
-  const numberOfNights = Math.ceil((checkOutDate - checkInDate) / msInDay);
+  const inDate = new Date(checkIn);
+  const outDate = new Date(checkOut);
+  inDate.setHours(0, 0, 0, 0);
+  outDate.setHours(0, 0, 0, 0);
 
-  // ✅ Check overlapping bookings
+  if (inDate >= outDate) {
+    return next(new ErrorHandler("Check-out must be after check-in", 400));
+  }
+
+  // Check conflict
   const conflict = await Booking.findOne({
     property: propertyId,
     bookingStatus: { $in: ["pending", "confirmed"] },
-    checkIn: { $lte: checkOutDate },
-    checkOut: { $gte: checkInDate },
+    checkIn: { $lte: outDate },
+    checkOut: { $gte: inDate },
   });
 
   if (conflict) {
     return next(new ErrorHandler("Property already booked for selected dates", 409));
   }
 
-  // ✅ Price, tax, and total calculation
+  // Price Calculation
   const pricePerNight = Number(property.price);
+  const msInDay = 1000 * 60 * 60 * 24;
+  const numberOfNights = Math.ceil((outDate - inDate) / msInDay) || 1;
   const subtotalAmount = pricePerNight * numberOfNights;
-  const serviceFee = Number(clientServiceFee) || 0;
 
-  // Example GST calculation
-  let gstRate = 0;
-  if (pricePerNight >= 1001 && pricePerNight <= 7499) gstRate = 12;
-  else if (pricePerNight >= 7500) gstRate = 18;
+  let gstRate = pricePerNight >= 7500 ? 18 : pricePerNight >= 1001 ? 12 : 0;
+  const taxAmount = Number((subtotalAmount * (gstRate / 100)).toFixed(2));
+  const computedTotal = Number((subtotalAmount + Number(serviceFee) + taxAmount).toFixed(2));
 
+  // 🟡 ❗ If frontend price and backend price mismatch → Prevent booking fraud
+  if (computedTotal !== Number(totalAmount)) {
+    return next(new ErrorHandler("Price mismatch. Refresh and try again.", 400));
+  }
+
+  const booking = await Booking.create({
+    user: req.user._id,
+    property: propertyId,
+    guests,
+    checkIn: inDate,
+    checkOut: outDate,
+    numberOfNights,
+    pricePerNight,
+    subtotalAmount,
+    discountAmount: 0,
+    taxAmount,
+    totalAmount: computedTotal,
+    serviceFee,
+    paymentMethod: "card",
+    paymentStatus: "pending",
+    bookingStatus: "pending",
+    createdBy: req.user._id,
+    updatedBy: req.user._id,
+    statusHistory: [
+      { status: "pending", changedBy: req.user._id, note: "Temporary booking before payment" },
+    ],
+  });
+
+  res.status(201).json({ success: true, booking });
+});
+
+// ⭐ 3) Final Booking if Payment Method = Cash
+export const postBookingProperty = catchAsyncError(async (req, res, next) => {
+  const {
+    checkIn, checkOut, guests,
+    serviceFee = 0, paymentMethod,
+    discountAmount = 0, couponCode,
+  } = req.body;
+
+  const propertyId = req.params.propertyId;
+  if (!checkIn || !checkOut || !guests?.adults || !paymentMethod) {
+    return next(new ErrorHandler("All booking fields are required", 400));
+  }
+
+  const checkInDate = new Date(checkIn);
+  const checkOutDate = new Date(checkOut);
+  checkInDate.setHours(0, 0, 0, 0);
+  checkOutDate.setHours(0, 0, 0, 0);
+
+  const property = await Property.findById(propertyId);
+  if (!property) return next(new ErrorHandler("Property not found", 404));
+
+  if (req.user?.role?.toLowerCase() === "host") {
+    return next(new ErrorHandler("Hosts cannot book properties", 403));
+  }
+
+  const numberOfNights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
+  const subtotalAmount = property.price * numberOfNights;
+
+  let gstRate = property.price >= 7500 ? 18 : property.price >= 1001 ? 12 : 0;
   const taxAmount = Number(((subtotalAmount - discountAmount) * (gstRate / 100)).toFixed(2));
   const totalAmount = Number((subtotalAmount - discountAmount + serviceFee + taxAmount).toFixed(2));
 
   const isCash = paymentMethod === "cash";
-
-  // ✅ Transaction to avoid race condition
   const session = await mongoose.startSession();
   let createdBooking;
 
   try {
     await session.withTransaction(async () => {
-      // Re-check conflict inside transaction
       const conflict2 = await Booking.findOne({
         property: propertyId,
         bookingStatus: { $in: ["pending", "confirmed"] },
@@ -121,55 +140,39 @@ export const postBookingProperty = catchAsyncError(async (req, res, next) => {
         checkOut: { $gte: checkInDate },
       }).session(session);
 
-      if (conflict2) throw new Error("Property already booked for selected dates");
+      if (conflict2) throw new ErrorHandler("Property already booked for selected dates", 409);
 
-      const docs = await Booking.create(
-        [
-          {
-            guest: req.user._id,
-            property: property._id,
-            guests,
-            checkIn: checkInDate,
-            checkOut: checkOutDate,
-            subtotalAmount,
-            discountAmount,
-            couponCode,
-            taxAmount,
-            totalAmount,
-            paymentMethod,
-            paymentStatus: isCash ? "paid" : "pending",
-            bookingStatus: isCash ? "confirmed" : "pending",
-            createdBy: req.user._id,
-            updatedBy: req.user._id,
-            statusHistory: [
-              {
-                status: isCash ? "confirmed" : "pending",
-                changedBy: req.user._id,
-                note: "Initial booking",
-              },
-            ],
-          },
-        ],
-        { session }
-      );
+      const docs = await Booking.create([{
+        user: req.user._id,
+        property: propertyId,
+        guests,
+        checkIn: checkInDate,
+        checkOut: checkOutDate,
+        numberOfNights,
+        pricePerNight: property.price,
+        subtotalAmount,
+        discountAmount,
+        couponCode,
+        taxAmount,
+        totalAmount,
+        serviceFee,
+        paymentMethod,
+        paymentStatus: isCash ? "paid" : "pending",
+        bookingStatus: isCash ? "confirmed" : "pending",
+        createdBy: req.user._id,
+        updatedBy: req.user._id,
+        statusHistory: [{ status: isCash ? "confirmed" : "pending", changedBy: req.user._id }],
+      }], { session });
 
       createdBooking = docs[0];
     });
-  } catch (err) {
-    if (err.message && err.message.includes("Property already booked")) {
-      return next(new ErrorHandler("Property already booked for selected dates", 409));
-    }
-    return next(err);
   } finally {
     session.endSession();
   }
 
-  res.status(201).json({
-    success: true,
-    message: "Booking created successfully",
-    booking: createdBooking,
-  });
+  res.status(201).json({ success: true, booking: createdBooking });
 });
+
 
 // Expend the booking date both 
 export const editBookingPropertyDate = catchAsyncError(async (req, res, next) => {
@@ -378,7 +381,7 @@ export const checkBookingConflict = catchAsyncError(async (req, res, next) => {
       { checkIn: { $lt: checkOutDate } },
       { checkOut: { $gt: checkInDate } }
     ]
-}).select("checkIn checkOut user");
+  }).select("checkIn checkOut user");
 
 
   // ---------------------------

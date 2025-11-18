@@ -13,7 +13,7 @@ const paymentSchema = new mongoose.Schema(
     paymentMethod: {
       type: String,
       enum: ["card", "upi", "netbanking", "wallet", "cash", "qr"],
-      default: "card",
+      default: "upi"
     },
 
     // Optional fields for UPI/QR
@@ -44,6 +44,10 @@ const paymentSchema = new mongoose.Schema(
       type: Date,
       default: null
     },
+
+    transactionId: { type: String, default: null },
+    paymentStatusMessage: { type: String, default: null },
+    paymentGateway: { type: String, default: "Razorpay" },
 
     platformFee: {
       type: Number,

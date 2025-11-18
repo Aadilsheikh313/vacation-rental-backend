@@ -5,6 +5,7 @@ import { Booking } from '../models/Booking.js';
 import { Payment } from '../models/Payment.js';
 import ErrorHandler from '../middlewares/errorMiddleware.js';
 import { catchAsyncError } from '../middlewares/catchAsyncError.js';
+import { log } from 'console';
 
 // init razorpay
 const razorpay = new Razorpay({
@@ -20,17 +21,19 @@ export const createOrder = catchAsyncError(async (req, res, next) => {
   const { bookingId } = req.body;
   if (!bookingId) return next(new ErrorHandler('bookingId required', 400));
 
-  const booking = await Booking.findById(bookingId).populate('property');
+  // find booking and ensure pending
+  const booking = await Booking.findById(bookingId).populate("property");
   if (!booking) return next(new ErrorHandler('Booking not found', 404));
+  if (booking.paymentStatus === "paid") return next(new ErrorHandler('Booking already paid', 400));
 
-  const amountRupees = booking.totalAmount;
+  const amountRupees = Number(booking.totalAmount);
   if (amountRupees <= 0) return next(new ErrorHandler('Invalid amount', 400));
 
   const options = {
     amount: toPaisa(amountRupees),
     currency: 'INR',
-    receipt: bookingId.toString(),
-    payment_capture: 1, // auto capture
+    receipt: bookingId.toString(),       // receipt = bookingId helps mapping
+    payment_capture: 1,
     notes: {
       bookingId: bookingId.toString(),
       propertyId: booking.property?._id?.toString() || '',
@@ -39,138 +42,113 @@ export const createOrder = catchAsyncError(async (req, res, next) => {
   };
 
   const order = await razorpay.orders.create(options);
-  // return the order to frontend to open checkout
+  // return the order to frontend
   res.status(200).json({
-     success: true, 
-     order
-     });
+    success: true,
+    order,               // order.id, order.amount, etc
+  });
 });
 
+
 export const getKey = async (req, res) => {
-    res.status(200).json({
-        key: key_id,
-    })
+  res.status(200).json({
+    key: process.env.RAZORPAY_KEY_ID,
+  })
 };
-// VERIFY PAYMENT (handler called by frontend after successful checkout)
+
+
 export const verifyPayment = catchAsyncError(async (req, res, next) => {
-  const {
-    razorpay_order_id,
-    razorpay_payment_id,
-    razorpay_signature,
-    bookingId,
-    // optionally: paymentMethod etc.
-  } = req.body;
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, bookingId } = req.body;
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !bookingId)
+    return next(new ErrorHandler('All payment params & bookingId are required', 400));
 
-  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !bookingId) {
-    return next(new ErrorHandler('Missing payment verification parameters', 400));
-  }
-
-  // verify signature (order_id|payment_id HMAC-SHA256 using secret)
   const generated_signature = crypto
     .createHmac('sha256', process.env.RAZORPAY_SECRET)
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)
     .digest('hex');
 
-  if (generated_signature !== razorpay_signature) {
-    return next(new ErrorHandler('Payment signature verification failed', 400));
-  }
+  if (generated_signature !== razorpay_signature)
+    return next(new ErrorHandler('Invalid payment signature', 400));
 
-  // fetch booking + property
   const booking = await Booking.findById(bookingId).populate('property');
   if (!booking) return next(new ErrorHandler('Booking not found', 404));
 
-  // compute fees (configurable)
-  const PLATFORM_FEE_PERCENT = Number(process.env.PLATFORM_FEE_PERCENT || 2);
-  const platformFee = +(booking.property.price * (PLATFORM_FEE_PERCENT / 100)).toFixed(2); // rupees
-  const hostAmountRupees = +(booking.totalAmount - platformFee).toFixed(2);
+  // update booking
+  booking.paymentStatus = "paid";
+  booking.bookingStatus = "confirmed";
+  booking.paymentId = razorpay_payment_id;
+  booking.statusHistory.push({ status: "confirmed", changedBy: req.user._id, note: "Payment verified" });
+  await booking.save();
 
-  // create payment record
+  const platformFee = +(booking.totalAmount * (Number(process.env.PLATFORM_FEE_PERCENT || 2) / 100)).toFixed(2);
+  const hostAmount = +(booking.totalAmount - platformFee).toFixed(2);
+
   const paymentDoc = await Payment.create({
     razorpay_order_id,
     razorpay_payment_id,
     razorpay_signature,
-    bookingId,
+    bookingId: booking._id,
     userId: req.user._id,
     hostId: booking.property.userId,
-    hostRazorpayAccount: booking.property.hostRazorpayAccount, // ensure stored on property
+    hostRazorpayAccount: booking.property.hostRazorpayAccount || null,
     amount: booking.totalAmount,
-    paymentMethod: booking.paymentMethod || 'online',
+    paymentMethod: booking.paymentMethod || "Razorpay",
     platformFee,
-    payoutStatus: 'pending',
-    status: 'success',
+    payoutStatus: booking.property.hostRazorpayAccount ? "pending" : "failed",
+    status: "success",
   });
 
-  // update booking statuses
-  booking.paymentStatus = 'paid';
-  booking.bookingStatus = 'confirmed';
-  await booking.save();
-
-  // If there's no host connected account, leave payout pending and return
-  const hostAccountId = booking.property.hostRazorpayAccount;
-  if (!hostAccountId) {
-    // Admin / manual onboarding required for host account
-    return res.status(200).json({
-      success: true,
-      message: 'Payment verified, but host has no connected account. Manual payout required.',
-      payment: paymentDoc,
-    });
-  }
-
-  // Create transfer to host using Route / Transfers API.
-  // Approach A: Use Razorpay Node SDK (if supported)
-  try {
-    // prepare transfers array (amount in paisa)
-    const transfersBody = {
-      transfers: [
-        {
-          account: hostAccountId, // linked account id, e.g. acc_xxx
-          amount: toPaisa(hostAmountRupees),
-          currency: 'INR',
-          notes: {
-            bookingId: bookingId.toString(),
-            platformFee: platformFee.toString(),
+  // If host account exists, attempt transfer (best-effort)
+  if (booking.property.hostRazorpayAccount) {
+    try {
+      const transfersBody = {
+        transfers: [
+          {
+            account: booking.property.hostRazorpayAccount,
+            amount: toPaisa(hostAmount),
+            currency: 'INR',
+            notes: { bookingId: booking._id.toString(), platformFee: platformFee.toString() },
           },
-        },
-      ],
-    };
+        ],
+      };
 
-    // Some SDK versions expose razorpay.payments.transfer/payment.transfer. If not, fallback to direct REST call (below).
-    let transferResponse;
-    if (typeof razorpay.payments.transfer === 'function') {
-      // Many older examples call razorpay.payments.transfer(paymentId, body)
-      transferResponse = await razorpay.payments.transfer(razorpay_payment_id, transfersBody);
-    } else {
-      // Fallback: raw POST using axios to /v1/payments/:id/transfers
-      const url = `https://api.razorpay.com/v1/payments/${razorpay_payment_id}/transfers`;
-      transferResponse = (await axios.post(url, transfersBody, {
-        auth: { username: process.env.RAZORPAY_KEY_ID, password: process.env.RAZORPAY_SECRET },
-        headers: { 'Content-Type': 'application/json' },
-      })).data;
+      const transferResponse = (await axios.post(
+        `https://api.razorpay.com/v1/payments/${razorpay_payment_id}/transfers`,
+        transfersBody,
+        { auth: { username: process.env.RAZORPAY_KEY_ID, password: process.env.RAZORPAY_SECRET } }
+      )).data;
+
+      paymentDoc.payoutStatus = 'paid';
+      paymentDoc.payoutAt = new Date();
+      await paymentDoc.save();
+
+      return res.status(200).json({
+        success: true,
+        message: 'Payment verified & host transfer initiated',
+        booking,
+        payment: paymentDoc,
+        transferResponse,
+      });
+    } catch (err) {
+      paymentDoc.payoutStatus = 'failed';
+      await paymentDoc.save();
+      return res.status(200).json({
+        success: true,
+        message: 'Payment verified but payout failed (admin action required)',
+        booking,
+        payment: paymentDoc,
+        error: err?.response?.data || err?.message,
+      });
     }
-
-    // mark payout success (or pending depending on response)
-    paymentDoc.payoutStatus = 'paid';
-    paymentDoc.payoutAt = new Date();
-    await paymentDoc.save();
-
-    return res.status(200).json({
-      success: true,
-      message: 'Payment verified and transfer to host initiated',
-      payment: paymentDoc,
-      transferResponse,
-    });
-  } catch (err) {
-    // mark payout failed but payment success
-    paymentDoc.payoutStatus = 'failed';
-    await paymentDoc.save();
-    console.error('Host payout failed:', err?.response?.data || err.message || err);
-    return res.status(200).json({
-      success: true,
-      message: 'Payment verified but host payout failed. Admin action required.',
-      payment: paymentDoc,
-      error: err?.response?.data || err?.message,
-    });
   }
+
+  // if host account not configured:
+  return res.status(200).json({
+    success: true,
+    message: 'Payment verified. Host payout pending (no connected account).',
+    booking,
+    payment: paymentDoc,
+  });
 });
 
 // WEBHOOK (recommended) - receives various events from Razorpay and verifies signature

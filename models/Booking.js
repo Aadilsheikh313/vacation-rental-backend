@@ -2,17 +2,14 @@ import mongoose from "mongoose";
 
 const bookingSchema = new mongoose.Schema(
   {
-    // 🔹 Guest (User) info
     user: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",        // Refers to User model
+      ref: "User",
       required: true,
     },
-
-    // 🔹 Property info
     property: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Property",    // Refers to Property model
+      ref: "Property",
       required: true,
     },
 
@@ -20,27 +17,18 @@ const bookingSchema = new mongoose.Schema(
       adults: { type: Number, required: true },
       children: { type: Number, default: 0 },
       infants: { type: Number, default: 0 },
-      pets: { type: Number, default: 0 }
+      pets: { type: Number, default: 0 },
     },
 
-    // 🔹 Booking Dates
-    checkIn: {
-      type: Date,
-      required: true,
-    },
-    checkOut: {
-      type: Date,
-      required: true,
-    },
+    checkIn: { type: Date, required: true },
+    checkOut: { type: Date, required: true },
 
-    // 🔹 Booking Status
     bookingStatus: {
       type: String,
       enum: ["pending", "confirmed", "cancelled", "completed"],
       default: "pending",
     },
 
-    // 🔹 Payment Info
     paymentMethod: {
       type: String,
       enum: ["card", "upi", "netbanking", "wallet", "cash", "qr"],
@@ -52,79 +40,60 @@ const bookingSchema = new mongoose.Schema(
       default: "pending",
     },
 
-    // 🔹 Pricing Details
-    subtotalAmount: {
+    // 🔹 Payment Details
+    paymentId: { type: String, default: null }, // Razorpay Payment ID
+    bookingCode: { type: String, unique: true, sparse: true }, // Eg: VRL2025-123XYZ
+
+    subtotalAmount: { type: Number, required: true },
+    discountAmount: { type: Number, default: 0 },
+    couponCode: { type: String, trim: true },
+    taxAmount: { type: Number, default: 0 },
+    totalAmount: { type: Number, required: true },
+
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+
+    numberOfNights: {
       type: Number,
       required: true,
     },
-    discountAmount: {
+    pricePerNight: {
       type: Number,
-      default: 0,
-    },
-    couponCode: {
-      type: String,
-      trim: true,
-    },
-    taxAmount: {
-      type: Number,
-      default: 0,
-    },
-    totalAmount: {
-      type: Number,
-      required: true,
     },
 
-    // 🔹 Audit Logs (who created/updated booking)
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",   // Could be guest or admin
-    },
-    updatedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",   // Could be guest or admin
-    },
 
-    // 🔹 Status Change History (useful for admin panel & audit)
     statusHistory: [
       {
         status: {
           type: String,
           enum: ["pending", "confirmed", "cancelled", "completed"],
         },
-        changedAt: {
-          type: Date,
-          default: Date.now,
-        },
-        changedBy: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",  // User or Admin who changed status
-        },
-        note: String,   // Optional note (e.g., "Payment confirmed by admin")
+        changedAt: { type: Date, default: Date.now },
+        changedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        note: String,
       },
     ],
 
-    // 🔹 Admin Actions (optional)
-    handledByAdmin: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Admin",
-      default: null,
-    },
-    adminNote: {
-      type: String,
-      default: null,
-      trim: true,
-    },
+    handledByAdmin: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
+    adminNote: { type: String, default: null, trim: true },
   },
   { timestamps: true }
 );
 
-// ✅ Indexes for faster queries
+// 🔥 Index Optimization
 bookingSchema.index({ user: 1, property: 1, checkIn: 1 });
 bookingSchema.index({ bookingStatus: 1, paymentStatus: 1 });
+bookingSchema.index({ bookingCode: 1 }); // For booking reference searches
 
+// 🔒 Validation
 bookingSchema.pre("save", function (next) {
   if (this.checkOut <= this.checkIn) {
     return next(new Error("Check-out date must be after check-in date"));
+  }
+
+  // Generate unique bookingCode only if not already set
+  if (!this.bookingCode) {
+    this.bookingCode = `VRL-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
   }
   next();
 });

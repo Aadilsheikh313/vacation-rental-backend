@@ -9,12 +9,16 @@ import {
     getActiveBooking,
     getHostBookingHistory,
     deleteGuestHistroyBooking,
+    createTempBooking,
 } from "../controllers/bookingController.js";
 
 
 const router = express.Router();
 
 router.get("/my-bookings", isAuthorized, getBookingProperty);
+
+router.post("/create-temp", isAuthorized, createTempBooking);
+
 router.post("/property/:propertyId", isAuthorized, postBookingProperty);
 router.put("/bookings/:bookingId/edit", isAuthorized, editBookingPropertyDate);
 router.delete("/bookings/:bookingId/delete", isAuthorized, cancelBookingPropertyDate);
