@@ -113,6 +113,7 @@ export const verifyPayment = catchAsyncError(async (req, res, next) => {
             userId: req.user._id,
             amount: booking.totalAmount,
             platformFee,
+            paymentMethod: "razorpay", 
             status: "success",
             payoutStatus: booking.property.hostRazorpayAccount ? "pending" : "not_applicable",
           },
@@ -122,11 +123,11 @@ export const verifyPayment = catchAsyncError(async (req, res, next) => {
       paymentDoc = paymentDoc[0];
     });
   } catch (error) {
-  if (session.inTransaction()) await session.abortTransaction();
-  return next(new ErrorHandler(error.message || "Payment verification failed", 400));
-} finally {
-  await session.endSession();
-}
+    if (session.inTransaction()) await session.abortTransaction();
+    return next(new ErrorHandler(error.message || "Payment verification failed", 400));
+  } finally {
+    await session.endSession();
+  }
 
 
   /**
@@ -172,5 +173,21 @@ export const verifyPayment = catchAsyncError(async (req, res, next) => {
     message: "Payment verified successfully",
     booking,
     payment: paymentDoc,
+  });
+});
+
+
+export const getPaymentStatus = catchAsyncError(async (req, res, next) => {
+  const { bookingId } = req.params;
+
+  const booking = await Booking.findById(bookingId).populate("property");
+  if (!booking) return next(new ErrorHandler("Booking not found", 404));
+
+  const payment = await Payment.findOne({ bookingId }).sort({ createdAt: -1 });
+
+  return res.status(200).json({
+    success: true,
+    booking,
+    payment: payment || null, // cash booking case
   });
 });

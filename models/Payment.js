@@ -31,6 +31,7 @@ const paymentSchema = new mongoose.Schema(
       required: true,
     },
 
+
     // 🔹 Razorpay details (only required for Razorpay)
     razorpay_order_id: { type: String },
     razorpay_payment_id: { type: String },
@@ -50,6 +51,12 @@ const paymentSchema = new mongoose.Schema(
     paymentStatusMessage: { type: String, trim: true },
     transactionId: { type: String, trim: true },
 
+    payoutStatus: {
+      type: String,
+      enum: ["pending", "paid", "failed", "not_applicable"],
+      default: "not_applicable",
+    },
+
     // 🔁 Refund data
     refundedAmount: { type: Number, default: 0 },
     refundReason: { type: String, trim: true },
@@ -58,11 +65,7 @@ const paymentSchema = new mongoose.Schema(
     // 🧾 Host settlement
     hostId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     hostRazorpayAccount: { type: String, trim: true },
-    payoutStatus: {
-      type: String,
-      enum: ["pending", "paid", "failed"],
-      default: "pending",
-    },
+
     payoutAt: { type: Date },
 
     // 🔄 Payment gateway used
