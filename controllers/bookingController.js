@@ -1,15 +1,18 @@
+// controllers/bookingController.js
 import { catchAsyncError } from "../middlewares/catchAsyncError.js";
 import ErrorHandler from "../middlewares/errorMiddleware.js";
 import { Booking } from "../models/Booking.js";
 import { Property } from "../models/Property.js";
 import mongoose from "mongoose";
 
-// ⭐ 1) Get all bookings of logged-in user
+/**
+ * Get all bookings for logged-in user
+ */
 export const getBookingProperty = catchAsyncError(async (req, res, next) => {
   const bookings = await Booking.find({ user: req.user._id })
     .populate({
       path: "property",
-      select: "title image city userId",
+      select: "title image city price userId hostRazorpayAccount",
       populate: { path: "userId", select: "name email phone" },
     })
     .sort({ createdAt: -1 });
@@ -17,20 +20,21 @@ export const getBookingProperty = catchAsyncError(async (req, res, next) => {
   res.status(200).json({ success: true, bookings });
 });
 
-// ⭐ 2) Create Temporary Booking (Before Payment)
+/**
+ * Create PENDING TEMP BOOKING for online payment (Razorpay, UPI, Card etc.)
+ */
 export const createTempBooking = catchAsyncError(async (req, res, next) => {
   const { propertyId, checkIn, checkOut, guests, serviceFee = 0, totalAmount } = req.body;
 
   if (!propertyId || !checkIn || !checkOut || !totalAmount) {
-    return next(new ErrorHandler("propertyId, checkIn, checkOut and totalAmount are required", 400));
+    return next(new ErrorHandler("Required fields missing", 400));
   }
 
   const property = await Property.findById(propertyId);
   if (!property) return next(new ErrorHandler("Property not found", 404));
 
-  // ❌ Prevent host from booking own properties
   if (req.user?.role?.toLowerCase() === "host") {
-    return next(new ErrorHandler("Hosts are not allowed to book properties", 403));
+    return next(new ErrorHandler("Hosts cannot book properties", 403));
   }
 
   const inDate = new Date(checkIn);
@@ -38,11 +42,9 @@ export const createTempBooking = catchAsyncError(async (req, res, next) => {
   inDate.setHours(0, 0, 0, 0);
   outDate.setHours(0, 0, 0, 0);
 
-  if (inDate >= outDate) {
-    return next(new ErrorHandler("Check-out must be after check-in", 400));
-  }
+  if (inDate >= outDate) return next(new ErrorHandler("Invalid stay duration", 400));
 
-  // Check conflict
+  // Conflict check
   const conflict = await Booking.findOne({
     property: propertyId,
     bookingStatus: { $in: ["pending", "confirmed"] },
@@ -54,19 +56,16 @@ export const createTempBooking = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler("Property already booked for selected dates", 409));
   }
 
-  // Price Calculation
+  // Price calculation (server = master)
   const pricePerNight = Number(property.price);
-  const msInDay = 1000 * 60 * 60 * 24;
-  const numberOfNights = Math.ceil((outDate - inDate) / msInDay) || 1;
+  const numberOfNights = Math.ceil((outDate - inDate) / (1000 * 60 * 60 * 24)) || 1;
   const subtotalAmount = pricePerNight * numberOfNights;
-
   let gstRate = pricePerNight >= 7500 ? 18 : pricePerNight >= 1001 ? 12 : 0;
   const taxAmount = Number((subtotalAmount * (gstRate / 100)).toFixed(2));
-  const computedTotal = Number((subtotalAmount + Number(serviceFee) + taxAmount).toFixed(2));
+  const computedTotal = +(subtotalAmount + Number(serviceFee) + taxAmount).toFixed(2);
 
-  // 🟡 ❗ If frontend price and backend price mismatch → Prevent booking fraud
-  if (computedTotal !== Number(totalAmount)) {
-    return next(new ErrorHandler("Price mismatch. Refresh and try again.", 400));
+  if (Math.abs(Number(totalAmount) - computedTotal) > 1) {
+    return next(new ErrorHandler("Pricing mismatch. Refresh and retry.", 400));
   }
 
   const booking = await Booking.create({
@@ -82,30 +81,34 @@ export const createTempBooking = catchAsyncError(async (req, res, next) => {
     taxAmount,
     totalAmount: computedTotal,
     serviceFee,
-    paymentMethod: "card",
-    paymentStatus: "pending",
     bookingStatus: "pending",
+    paymentStatus: "pending",
+    paymentMethod: null,
     createdBy: req.user._id,
     updatedBy: req.user._id,
-    statusHistory: [
-      { status: "pending", changedBy: req.user._id, note: "Temporary booking before payment" },
-    ],
+    statusHistory: [{ status: "pending", changedBy: req.user._id, note: "Temporary booking awaiting payment" }],
   });
 
   res.status(201).json({ success: true, booking });
 });
 
-// ⭐ 3) Final Booking if Payment Method = Cash
+/**
+ * Cash booking → final booking without online payment
+ */
 export const postBookingProperty = catchAsyncError(async (req, res, next) => {
   const {
-    checkIn, checkOut, guests,
-    serviceFee = 0, paymentMethod,
-    discountAmount = 0, couponCode,
+    checkIn,
+    checkOut,
+    guests,
+    serviceFee = 0,
+    discountAmount = 0,
+    couponCode,
+    paymentMethod, // should be "cash"
   } = req.body;
 
   const propertyId = req.params.propertyId;
-  if (!checkIn || !checkOut || !guests?.adults || !paymentMethod) {
-    return next(new ErrorHandler("All booking fields are required", 400));
+  if (!checkIn || !checkOut || !guests?.adults) {
+    return next(new ErrorHandler("Required fields missing", 400));
   }
 
   const checkInDate = new Date(checkIn);
@@ -120,57 +123,68 @@ export const postBookingProperty = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler("Hosts cannot book properties", 403));
   }
 
-  const numberOfNights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
-  const subtotalAmount = property.price * numberOfNights;
+  const pricePerNight = Number(property.price);
+  const numberOfNights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24)) || 1;
+  const subtotalAmount = pricePerNight * numberOfNights;
+  let gstRate = pricePerNight >= 7500 ? 18 : pricePerNight >= 1001 ? 12 : 0;
+  const taxAmount = Number((subtotalAmount * (gstRate / 100)).toFixed(2));
+  const computedTotal = +(subtotalAmount + Number(serviceFee) + taxAmount).toFixed(2);
 
-  let gstRate = property.price >= 7500 ? 18 : property.price >= 1001 ? 12 : 0;
-  const taxAmount = Number(((subtotalAmount - discountAmount) * (gstRate / 100)).toFixed(2));
-  const totalAmount = Number((subtotalAmount - discountAmount + serviceFee + taxAmount).toFixed(2));
-
-  const isCash = paymentMethod === "cash";
+  // Transaction-safe creation
   const session = await mongoose.startSession();
-  let createdBooking;
+  let created;
 
   try {
     await session.withTransaction(async () => {
-      const conflict2 = await Booking.findOne({
+      const conflict = await Booking.findOne({
         property: propertyId,
         bookingStatus: { $in: ["pending", "confirmed"] },
         checkIn: { $lte: checkOutDate },
         checkOut: { $gte: checkInDate },
       }).session(session);
 
-      if (conflict2) throw new ErrorHandler("Property already booked for selected dates", 409);
+      if (conflict) throw new ErrorHandler("Property already booked for selected dates", 409);
 
-      const docs = await Booking.create([{
-        user: req.user._id,
-        property: propertyId,
-        guests,
-        checkIn: checkInDate,
-        checkOut: checkOutDate,
-        numberOfNights,
-        pricePerNight: property.price,
-        subtotalAmount,
-        discountAmount,
-        couponCode,
-        taxAmount,
-        totalAmount,
-        serviceFee,
-        paymentMethod,
-        paymentStatus: isCash ? "paid" : "pending",
-        bookingStatus: isCash ? "confirmed" : "pending",
-        createdBy: req.user._id,
-        updatedBy: req.user._id,
-        statusHistory: [{ status: isCash ? "confirmed" : "pending", changedBy: req.user._id }],
-      }], { session });
+      const docs = await Booking.create(
+        [
+          {
+            user: req.user._id,
+            property: propertyId,
+            guests,
+            checkIn: checkInDate,
+            checkOut: checkOutDate,
+            numberOfNights,
+            pricePerNight,
+            subtotalAmount,
+            discountAmount,
+            couponCode,
+            taxAmount,
+            totalAmount: computedTotal,
+            serviceFee,
+            paymentMethod: paymentMethod || "cash",
+            paymentStatus: paymentMethod === "cash" ? "paid" : "pending",
+            bookingStatus: paymentMethod === "cash" ? "confirmed" : "pending",
+            createdBy: req.user._id,
+            updatedBy: req.user._id,
+            statusHistory: [
+              {
+                status: paymentMethod === "cash" ? "confirmed" : "pending",
+                changedBy: req.user._id,
+                note: "Cash booking confirmed at creation",
+              },
+            ],
+          },
+        ],
+        { session }
+      );
 
-      createdBooking = docs[0];
+      created = docs[0];
     });
   } finally {
     session.endSession();
   }
 
-  res.status(201).json({ success: true, booking: createdBooking });
+  res.status(201).json({ success: true, booking: created });
 });
 
 

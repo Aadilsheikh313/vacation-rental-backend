@@ -205,6 +205,10 @@ const propertySchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  hostRazorpayAccount:{
+    type: String,
+    default: null,
+  },
 });
 
 // Index for geospatial queries

@@ -1,11 +1,19 @@
-import express from 'express';
-import {  isAuthorized } from '../middlewares/authMiddleware.js';
-import { createOrder, getKey, verifyPayment } from '../controllers/paymentController.js';
+// routes/paymentRoutes.js
+import express from "express";
+import { isAuthorized } from "../middlewares/authMiddleware.js";
+import {
+  createOrder,
+  verifyPayment,
+  getKey,
+} from "../controllers/paymentController.js";
 
 const router = express.Router();
 
-router.post('/create-order', isAuthorized, createOrder);
-router.get('/getkey', isAuthorized, getKey);
-router.post('/verify', isAuthorized, verifyPayment);
+/**
+ * PAYMENT FLOW
+ */
+router.get("/key", isAuthorized, getKey);               // Get Razorpay Public Key
+router.post("/order", isAuthorized, createOrder);       // Create Razorpay Order
+router.post("/verify", isAuthorized, verifyPayment);    // Verify Payment + Confirm Booking
 
 export default router;
