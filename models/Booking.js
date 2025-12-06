@@ -108,6 +108,12 @@ const bookingSchema = new mongoose.Schema(
 
     // 🧾 Razorpay account for settlements
     hostRazorpayAccount: { type: String, trim: true },
+
+    action: {
+      enum: ["accept", "cancel"],
+      type: String,
+      default: null
+    },
   },
   { timestamps: true }
 );

@@ -1,5 +1,6 @@
 import { catchAsyncError } from "../middlewares/catchAsyncError.js";
 import ErrorHandler from "../middlewares/errorMiddleware.js";
+import { Booking } from "../models/Booking.js";
 import { Host } from "../models/HostSchema.js";
 
 export const submitHostProfile = catchAsyncError(async (req, res, next) => {
@@ -45,3 +46,5 @@ export const submitHostProfile = catchAsyncError(async (req, res, next) => {
     host,
   });
 });
+
+

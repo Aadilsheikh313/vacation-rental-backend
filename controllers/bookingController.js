@@ -4,7 +4,9 @@ import ErrorHandler from "../middlewares/errorMiddleware.js";
 import { Booking } from "../models/Booking.js";
 import { Property } from "../models/Property.js";
 import mongoose from "mongoose";
-
+import { Review } from "../models/Review.js"; 
+import { sendSMS } from "../utils/smsService.js";
+import { sendEmail } from "../utils/emailService.js";
 /**
  * Get all bookings for logged-in user
  */
@@ -506,6 +508,69 @@ export const getActiveBooking = catchAsyncError(async (req, res, next) => {
   });
 });
 
+// Host cancel and accepted cash booking request
+
+export const handleCashBookingRequest = catchAsyncError(async (req, res, next) => {
+  const { bookingId, action } = req.body;
+
+  if (req.user.role !== "host") {
+    return next(new ErrorHandler("Only hosts can perform this action", 403));
+  }
+  if (!bookingId || !action) {
+    return next(new ErrorHandler("bookingId & action required", 400));
+  }
+
+  const booking = await Booking.findById(bookingId)
+    .populate("user", "name email phone")
+    .populate("property", "title userId");
+
+  if (!booking) return next(new ErrorHandler("Booking not found", 404));
+
+  // Ensure host owns the property
+  if (String(booking.property.userId) !== String(req.user._id)) {
+    return next(new ErrorHandler("You do not own this property", 403));
+  }
+
+  if (booking.bookingStatus !== "pending") {
+    return next(new ErrorHandler("Only pending bookings can be accepted/cancelled", 400));
+  }
+
+  let newStatus;
+  let notifyMessage;
+
+  if (action === "accept") {
+    newStatus = "confirmed";
+    notifyMessage = `🎉 Booking ACCEPTED! Your stay at '${booking.property.title}' is confirmed.`;
+  } else if (action === "cancel") {
+    newStatus = "cancelled";
+    notifyMessage = `⚠ Booking CANCELLED for '${booking.property.title}'.`;
+  } else {
+    return next(new ErrorHandler("action must be accept or cancel", 400));
+  }
+
+  // Update booking
+  booking.bookingStatus = newStatus;
+  booking.paymentStatus = newStatus === "confirmed" ? "paid" : "pending";
+  booking.updatedBy = req.user._id;
+
+  booking.statusHistory.push({
+    status: newStatus,
+    changedBy: req.user._id,
+    note: `Host ${newStatus} booking`,
+  });
+
+  await booking.save();
+
+  //  🔔 SEND EMAIL & SMS
+  await sendEmail(booking.user.email, "Booking Update", notifyMessage);
+  await sendSMS(booking.user.phone, notifyMessage);
+
+  res.status(200).json({
+    success: true,
+    message: `Booking ${action}ed successfully`,
+    updatedStatus: newStatus,
+  });
+});
 // Get all host histroy booking property only
 export const getHostBookingHistory = catchAsyncError(async (req, res, next) => {
   const hostId = req.user._id;
@@ -546,7 +611,7 @@ export const getHostBookingHistory = catchAsyncError(async (req, res, next) => {
       title: property.title,
       image: property.image,
       city: property.city,
-      bookings, // ✅ can be empty if no bookings
+      bookings, 
     });
   }
 
