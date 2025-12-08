@@ -114,6 +114,28 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       default: null
     },
+
+    // 🔥 Update History Log (Audit Trail)
+updateHistory: [
+  {
+    updatedAt: { type: Date, default: Date.now },
+    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+
+    // Old → New Date
+    oldCheckIn: Date,
+    newCheckIn: Date,
+    oldCheckOut: Date,
+    newCheckOut: Date,
+
+    // Old → New Guests
+    oldGuests: { type: guestSchema },
+    newGuests: { type: guestSchema },
+
+    // Optional history note
+    note: { type: String, trim: true },
+  },
+],
+
   },
   { timestamps: true }
 );

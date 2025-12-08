@@ -11,6 +11,7 @@ import {
   getHostBookingHistory,
   deleteGuestHistroyBooking,
   createTempBooking,
+  handleCashBookingRequest,
 } from "../controllers/bookingController.js";
 
 const router = express.Router();
@@ -31,6 +32,7 @@ router.delete("/guest/delete-history/:bookingId", isAuthorized, deleteGuestHistr
 
 // Host routes
 router.get("/host/active-bookings", isAuthorized, getActiveBooking);
+router.post("/host/booking/aceptandcancel", isAuthorized, handleCashBookingRequest)
 router.get("/host/history-bookings", isAuthorized, getHostBookingHistory);
 
 export default router;

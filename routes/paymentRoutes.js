@@ -6,6 +6,8 @@ import {
   verifyPayment,
   getKey,
   getPaymentStatus,
+  editExtraPayment,
+  verifyEditExtraPayment,
 } from "../controllers/paymentController.js";
 
 const router = express.Router();
@@ -18,5 +20,10 @@ router.post("/order", isAuthorized, createOrder);       // Create Razorpay Order
 router.post("/verify", isAuthorized, verifyPayment);    // Verify Payment + Confirm Booking
 
 router.get("/status/:bookingId", isAuthorized, getPaymentStatus);
+
+
+/* ---- Edit Booking — Extra Payment ---- */
+router.post("/payment/extra/order", isAuthorized, editExtraPayment);
+router.post("/payment/extra/verify", isAuthorized, verifyEditExtraPayment);
 
 export default router;

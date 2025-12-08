@@ -4,7 +4,7 @@ import ErrorHandler from "../middlewares/errorMiddleware.js";
 import { Booking } from "../models/Booking.js";
 import { Property } from "../models/Property.js";
 import mongoose from "mongoose";
-import { Review } from "../models/Review.js"; 
+import { Review } from "../models/Review.js";
 import { sendSMS } from "../utils/smsService.js";
 import { sendEmail } from "../utils/emailService.js";
 /**
@@ -191,73 +191,136 @@ export const postBookingProperty = catchAsyncError(async (req, res, next) => {
 
 
 // Expend the booking date both 
+// Extend / Reduce / Modify Booking Date + Guests
 export const editBookingPropertyDate = catchAsyncError(async (req, res, next) => {
   const bookingId = req.params.bookingId;
   const { checkIn, checkOut, guests } = req.body;
 
-  // ✅ Get existing booking
+  // Fetch booking with existing price and property details
   const booking = await Booking.findById(bookingId).populate("property");
   if (!booking) return next(new ErrorHandler("Booking not found", 404));
 
-  // ✅ Ensure only the same user can edit
+  // Only owner can edit
   if (booking.user.toString() !== req.user._id.toString()) {
     return next(new ErrorHandler("You are not authorized to edit this booking", 403));
   }
 
-  // ✅ Prevent editing if booking is already completed
-  if (new Date() > new Date(booking.checkOut)) {
-    return next(new ErrorHandler("Cannot update a past/completed booking", 400));
+  // Editing allowed only before check-in
+  const today = new Date();
+  const originalCheckIn = new Date(booking.checkIn);
+  today.setHours(0, 0, 0, 0);
+  originalCheckIn.setHours(0, 0, 0, 0);
+
+  if (today >= originalCheckIn) {
+    return next(new ErrorHandler("Booking can only be modified before check-in date", 400));
   }
 
-  // ✅ Prevent editing if no actual change in booking
-  const sameCheckIn = new Date(booking.checkIn).toDateString() === new Date(checkIn).toDateString();
-  const sameCheckOut = new Date(booking.checkOut).toDateString() === new Date(checkOut).toDateString();
-  const sameGuests = booking.guests === guests;
+  const newCheckInDate = new Date(checkIn);
+  const newCheckOutDate = new Date(checkOut);
+  newCheckInDate.setHours(0, 0, 0, 0);
+  newCheckOutDate.setHours(0, 0, 0, 0);
 
-  if (sameCheckIn && sameCheckOut && sameGuests) {
-    return next(new ErrorHandler("No changes detected in booking details", 400));
+  // No changes check
+  const sameDates =
+    originalCheckIn.toDateString() === newCheckInDate.toDateString() &&
+    new Date(booking.checkOut).toDateString() === newCheckOutDate.toDateString();
+
+  const sameGuests =
+    booking.guests.adults === guests.adults &&
+    booking.guests.children === guests.children &&
+    booking.guests.infants === guests.infants &&
+    booking.guests.pets === guests.pets;
+
+  if (sameDates && sameGuests) {
+    return next(new ErrorHandler("No changes detected in booking", 400));
   }
 
-  // ✅ Conflict check: same property already booked for new dates by someone else
+  // Conflict check with other bookings
   const conflict = await Booking.findOne({
     _id: { $ne: bookingId },
     property: booking.property._id,
-    $or: [
-      { checkIn: { $lte: checkOut }, checkOut: { $gte: checkIn } }
-    ],
-    bookingStatus: { $in: ["pending", "confirmed"] }
+    bookingStatus: { $in: ["pending", "confirmed"] },
+    checkIn: { $lt: newCheckOutDate },
+    checkOut: { $gt: newCheckInDate },
   });
 
   if (conflict) {
-    return next(new ErrorHandler("Property already booked for the selected dates", 409));
+    return next(new ErrorHandler("Property already booked for selected dates", 409));
   }
 
-  // ✅ Updated price and total
-  const updatedPrice = booking.property.price;
-  const numberOfNights = Math.ceil((new Date(checkOut) - new Date(checkIn)) / (1000 * 60 * 60 * 24));
-  const totalNights = numberOfNights > 0 ? numberOfNights : 1;
+  // ----- PRICE RECALCULATION -----
+  const pricePerNight = Number(booking.property.price);
+  const numberOfNights = Math.ceil((newCheckOutDate - newCheckInDate) / (1000 * 60 * 60 * 24)) || 1;
+  const subtotal = pricePerNight * numberOfNights;
 
-  let newTotalAmount = updatedPrice * totalNights + booking.serviceFee + booking.taxes;
+  const gstRate = pricePerNight >= 7500 ? 18 : pricePerNight >= 1001 ? 12 : 0;
+  const taxAmount = Number(((subtotal * gstRate) / 100).toFixed(2));
+  const serviceFee = Number(booking.serviceFee) || 0;
+  const newTotalAmount = subtotal + serviceFee + taxAmount - (booking.discountAmount || 0);
 
-  // // 🔁 Mock penalty refund logic (if user had previously cancelled same booking — optional)
-  // let penalty = 0;
-  // let wasPreviouslyCancelled = false;
 
-  // // Optionally you can check a `CancelledBookings` model or track cancel history in user model
-  // if (wasPreviouslyCancelled) {
-  //   penalty = Math.round(newTotalAmount * 0.3); // 30% penalty
-  //   newTotalAmount -= penalty;
-  // }
+  // ----- PAYMENT DIFFERENCE -----
+  const oldTotalAmount = booking.totalAmount;
+  let balanceToPay = 0;
+  let refundAmount = 0;
 
-  // ✅ Update booking details
-  booking.checkIn = checkIn;
-  booking.checkOut = checkOut;
+  if (newTotalAmount > oldTotalAmount) {
+    balanceToPay = newTotalAmount - oldTotalAmount;  // extra amount to pay
+  }
+
+  if (newTotalAmount < oldTotalAmount) {
+    refundAmount = oldTotalAmount - newTotalAmount; // refundable amount if stay shortened
+  }
+
+  // SAVE HISTORY BEFORE UPDATE
+  booking.updateHistory.push({
+    updatedAt: new Date(),
+    updatedBy: req.user._id,
+    oldCheckIn: booking.checkIn,
+    newCheckIn: newCheckInDate,
+    oldCheckOut: booking.checkOut,
+    newCheckOut: newCheckOutDate,
+    oldGuests: booking.guests,
+    newGuests: guests,
+    note: "Booking modified before check-in",
+  });
+
+  // APPLY NEW VALUES
+  booking.checkIn = newCheckInDate;
+  booking.checkOut = newCheckOutDate;
   booking.guests = guests;
-  booking.pricePerNight = updatedPrice;
-  booking.numberOfNights = totalNights;
+  booking.pricePerNight = pricePerNight;
+  booking.numberOfNights = numberOfNights;
+  booking.taxAmount = taxAmount;
   booking.totalAmount = newTotalAmount;
-  booking.paymentStatus = "pending";
-  booking.bookingStatus = "pending";
+  booking.updatedBy = req.user._id;
+
+  // Final payment & status result
+  if (balanceToPay > 0) {
+    booking.extraPayment = balanceToPay;
+    booking.bookingStatus = "pending";
+    booking.paymentStatus = "pending";
+  } else if (refundAmount > 0) {
+    booking.refundAmount = refundAmount;
+    booking.bookingStatus = "confirmed"; // still confirmed
+    booking.paymentStatus = "paid"; // already paid
+  } else {
+    // SAME AMOUNT
+    booking.bookingStatus = "confirmed";
+    booking.paymentStatus = "paid";
+  }
+
+  // Add status history
+  booking.statusHistory.push({
+    status: booking.bookingStatus,
+    changedBy: req.user._id,
+    note:
+      balanceToPay > 0
+        ? `Extra payment required: ₹${balanceToPay}`
+        : refundAmount > 0
+          ? `Refund pending: ₹${refundAmount}`
+          : "Dates changed with no payment difference",
+  });
 
   await booking.save();
 
@@ -265,7 +328,12 @@ export const editBookingPropertyDate = catchAsyncError(async (req, res, next) =>
     success: true,
     message: "Booking updated successfully",
     updatedBooking: booking,
-    // penaltyApplied: penalty > 0 ? `₹${penalty} deducted` : "No penalty",
+    payment: {
+      needToPay: balanceToPay > 0,
+      extraAmount: balanceToPay || 0,
+      needRefund: refundAmount > 0,
+      refundAmount: refundAmount || 0,
+    },
   });
 });
 
@@ -562,8 +630,8 @@ export const handleCashBookingRequest = catchAsyncError(async (req, res, next) =
   await booking.save();
 
   //  🔔 SEND EMAIL & SMS
-  await sendEmail(booking.user.email, "Booking Update", notifyMessage);
-  await sendSMS(booking.user.phone, notifyMessage);
+  // await sendEmail(booking.user.email, "Booking Update", notifyMessage);
+  // await sendSMS(booking.user.phone, notifyMessage);
 
   res.status(200).json({
     success: true,
@@ -611,7 +679,7 @@ export const getHostBookingHistory = catchAsyncError(async (req, res, next) => {
       title: property.title,
       image: property.image,
       city: property.city,
-      bookings, 
+      bookings,
     });
   }
 
