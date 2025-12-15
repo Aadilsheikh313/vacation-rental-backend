@@ -115,26 +115,35 @@ const bookingSchema = new mongoose.Schema(
       default: null
     },
 
+     extraPayment: {
+      type: Number,
+      default: 0,
+    },
+
+    refundAmount: {
+      type: Number,
+      default: 0,
+    },
     // 🔥 Update History Log (Audit Trail)
-updateHistory: [
-  {
-    updatedAt: { type: Date, default: Date.now },
-    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    updateHistory: [
+      {
+        updatedAt: { type: Date, default: Date.now },
+        updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
 
-    // Old → New Date
-    oldCheckIn: Date,
-    newCheckIn: Date,
-    oldCheckOut: Date,
-    newCheckOut: Date,
+        // Old → New Date
+        oldCheckIn: Date,
+        newCheckIn: Date,
+        oldCheckOut: Date,
+        newCheckOut: Date,
 
-    // Old → New Guests
-    oldGuests: { type: guestSchema },
-    newGuests: { type: guestSchema },
+        // Old → New Guests
+        oldGuests: { type: guestSchema },
+        newGuests: { type: guestSchema },
 
-    // Optional history note
-    note: { type: String, trim: true },
-  },
-],
+        // Optional history note
+        note: { type: String, trim: true },
+      },
+    ],
 
   },
   { timestamps: true }

@@ -190,7 +190,7 @@ export const postBookingProperty = catchAsyncError(async (req, res, next) => {
 });
 
 
-// Expend the booking date both 
+
 // Extend / Reduce / Modify Booking Date + Guests
 export const editBookingPropertyDate = catchAsyncError(async (req, res, next) => {
   const bookingId = req.params.bookingId;

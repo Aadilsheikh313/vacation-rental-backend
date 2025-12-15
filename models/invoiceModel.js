@@ -16,12 +16,17 @@ const invoiceSchema = new mongoose.Schema({
     ref: "Property",
     required: true,
   },
+   propertyOwner: {          
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
   invoiceUrl: {
-    type: String, // ✅ Cloudinary URL or local path
+    type: String, 
     required: true,
   },
   invoicePublicId: {
-    type: String, // ✅ Useful if using Cloudinary (for delete)
+    type: String, 
   },
   invoiceNumber: {
     type: String,
