@@ -1,141 +1,270 @@
 import { catchAsyncError } from "../middlewares/catchAsyncError.js";
 import ErrorHandler from "../middlewares/errorMiddleware.js";
 import { Review } from "../models/Review.js";
-import {Property} from "../models/Property.js";
+import { Property } from "../models/Property.js";
+import { Booking } from "../models/Booking.js";
+import { autoCompleteIfExpired } from "../utils/autoCompleteBooking.js";
 
+/* ======================================================
+   🔧 Utility: Update Property Average Rating (DB)
+====================================================== */
+const updatePropertyRating = async (propertyId) => {
+  const reviews = await Review.find({
+    property: propertyId,
+    isHidden: false,
+    isVerifiedStay: true,
+  });
 
+  if (reviews.length === 0) {
+    await Property.findByIdAndUpdate(propertyId, {
+      avgRating: 0,
+      totalReviews: 0,
+    });
+    return;
+  }
+
+  const avgRating =
+    reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+
+  await Property.findByIdAndUpdate(propertyId, {
+    avgRating: Number(avgRating.toFixed(1)), // ✅ HERE
+    totalReviews: reviews.length,
+  });
+};
+
+/* ======================================================
+   1️⃣ Get All Reviews for a Property
+====================================================== */
 export const getAllReviewsForProperty = catchAsyncError(async (req, res) => {
-  const reviews = await Review.find({ property: req.params.propertyId })
-  .sort({ createdAt: -1 })
-  .populate("user", "name avatar");
+  const reviews = await Review.find({
+    property: req.params.propertyId,
+    isHidden: false,
+    isVerifiedStay: true,
+  })
+    .sort({ createdAt: -1 })
+    .populate("user", "name avatar");
+
   res.status(200).json({
     success: true,
     reviews,
   });
 });
 
-
+/* ======================================================
+   2️⃣ Post Review (Verified Stay Only)
+====================================================== */
 export const postReview = catchAsyncError(async (req, res, next) => {
-  const { rating, comment } = req.body;
-  const { propertyId } = req.params;
+  const userId = req.user._id;
+  const propertyId = req.params.propertyId;
+  const { rating, comment, cleanliness, comfort, service, location } = req.body;
 
-  if (!rating || !comment?.trim() || !propertyId) {
-    return next(new ErrorHandler("Rating, comment, and property ID are required!", 400));
+  // 1️⃣ Booking lao (NO completed filter)
+  let booking = await Booking.findOne({
+    user: userId,
+    property: propertyId,
+    paymentStatus: "paid",
+    checkOut: { $lt: new Date() },
+  }).sort({ checkOut: -1 });
+
+  if (!booking) {
+    return next(
+      new ErrorHandler("You can review only after completing your stay", 403)
+    );
   }
 
-  // 🔁 Check if user already submitted a review for this property
+  // 2️⃣ 🔥 AUTO-COMPLETE HERE (CORRECT PLACE)
+  booking = await autoCompleteIfExpired(booking);
+
+  // 3️⃣ Final status validation
+  if (booking.bookingStatus !== "completed") {
+    return next(
+      new ErrorHandler("You can review only after completing your stay", 403)
+    );
+  }
+
+  // 4️⃣ Prevent duplicate review (extra safety)
   const alreadyReviewed = await Review.findOne({
-    user: req.user._id,
+    user: userId,
     property: propertyId,
   });
 
   if (alreadyReviewed) {
-    return next(new ErrorHandler("You have already reviewed this property.", 400));
+    return next(
+      new ErrorHandler("You have already reviewed this property", 400)
+    );
   }
 
-  // ✅ Create review
+  // 5️⃣ Create review
   const review = await Review.create({
-    rating,
-    comment: comment.trim(),
+    user: userId,
     property: propertyId,
-    user: req.user._id,
+    rating,
+    comment,
+    cleanliness,
+    comfort,
+    service,
+    location,
+    isVerifiedStay: true,
   });
 
-  // 🔥 UPDATE PROPERTY'S AVERAGE RATING AND TOTAL REVIEWS
-  const allReviews = await Review.find({ property: propertyId });
-
-  const totalReviews = allReviews.length;
-  const avgRating = allReviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews;
-
-  await Property.findByIdAndUpdate(propertyId, {
-    avgRating: avgRating.toFixed(1),
-    totalReviews,
-  });
+  // 6️⃣ Update property rating
+  await updatePropertyRating(propertyId);
 
   res.status(201).json({
     success: true,
-    message: "Review posted successfully.",
+    message: "Review submitted successfully",
     review,
   });
 });
 
-export const editReview = catchAsyncError(async(req, res, next) =>{
-  const userId = req.user._id;
-  const propertyId = req.params.propertyId;
-  const reviewId = req.params.reviewId;
-  const {rating, comment} = req.body;
-  
-  if(!rating || !comment) {
-    return next(new ErrorHandler("Rating and comment are required for editing the review.", 400))
+
+/* ======================================================
+   3️⃣ Edit Review (48 Hours Window)
+====================================================== */
+export const editReview = catchAsyncError(async (req, res, next) => {
+  const review = await Review.findById(req.params.reviewId);
+
+  if (!review) return next(new ErrorHandler("Review not found", 404));
+
+  if (review.user.toString() !== req.user._id.toString()) {
+    return next(new ErrorHandler("Unauthorized", 403));
   }
 
-  const review = await Review.findOne({_id: reviewId, property: propertyId});
+  const hoursPassed =
+    (Date.now() - review.createdAt.getTime()) / (1000 * 60 * 60);
 
-  if(!review){
-    return next(new ErrorHandler("Review not Found", 404));
+  if (hoursPassed > 48) {
+    return next(
+      new ErrorHandler("Review edit window expired (48 hours)", 400)
+    );
   }
 
-  if(review.user.toString() !== userId.toString()){
-    return next(new ErrorHandler("You are not authorized to edit this review.", 403));
-  }
-  
-  review.rating = rating;
-  review.comment = comment.trim();
+  const allowedFields = [
+    "rating",
+    "comment",
+    "cleanliness",
+    "comfort",
+    "service",
+    "location",
+  ];
+
+  allowedFields.forEach((field) => {
+    if (req.body[field] !== undefined) {
+      review[field] = req.body[field];
+    }
+  });
+
   await review.save();
-
-  
-  // Recalculate average rating and total reviews
-  const allReviews = await Review.find({property: propertyId});
-
-  const totalReviews = allReviews.length;
-  const avgRating = allReviews.reduce((sum , r) => sum + r.rating, 0 ) / totalReviews;
-
-  await Property.findByIdAndUpdate(propertyId, {
-    avgRating: avgRating.toFixed(1),
-    totalReviews,
-  })
-
-    res.status(200).json({
-    success: true,
-    message: "Review updated successfully.",
-    review,
-  });
-
-})
-
-export const deleteReview = catchAsyncError(async (req, res, next) => {
-  const userId = req.user._id;
-  const propertyId = req.params.propertyId;
-  const reviewId = req.params.reviewId;
-
-  // Check if review exists
-  const review = await Review.findOne({ _id: reviewId, property: propertyId });
-
-  if (!review) {
-    return next(new ErrorHandler("Review not found", 404));
-  }
-
-  // Authorization: Only the review's author can delete
-  if (review.user.toString() !== userId.toString()) {
-    return next(new ErrorHandler("You are not authorized to delete this review.", 403));
-  }
-
-  // Delete review
-  await review.deleteOne();
-
-  // Update property's average rating and total reviews
-  const allReviews = await Review.find({ property: propertyId });
-
-  const totalReviews = allReviews.length;
-  const avgRating = totalReviews === 0 ? 0 : allReviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews;
-
-  await Property.findByIdAndUpdate(propertyId, {
-    avgRating: avgRating.toFixed(1),
-    totalReviews,
-  });
+  await updatePropertyRating(review.property); // ✅ RE-CALCULATE
 
   res.status(200).json({
     success: true,
-    message: "Review deleted successfully.",
+    message: "Review updated successfully",
+    review,
+  });
+});
+
+/* ======================================================
+   4️⃣ Host Reply
+====================================================== */
+export const hostReplyToReview = catchAsyncError(async (req, res, next) => {
+  const { message } = req.body;
+
+  if (!message || message.trim().length === 0) {
+    return next(new ErrorHandler("Reply message is required", 400));
+  }
+
+  const review = await Review.findById(req.params.reviewId).populate("property");
+
+  if (!review) return next(new ErrorHandler("Review not found", 404));
+
+  if (review.property.userId.toString() !== req.user._id.toString()) {
+    return next(new ErrorHandler("Only host can reply", 403));
+  }
+
+  review.hostReply = {
+    message,
+    repliedAt: new Date(),
+  };
+
+  await review.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Reply added successfully",
+    review,
+  });
+});
+
+/* ======================================================
+   5️⃣ Admin Hide / Unhide Review
+====================================================== */
+export const toggleReviewVisibility = catchAsyncError(async (req, res, next) => {
+  const { isHidden, reason } = req.body;
+
+  const review = await Review.findById(req.params.reviewId);
+  if (!review) return next(new ErrorHandler("Review not found", 404));
+
+  review.isHidden = isHidden;
+  review.hiddenReason = isHidden ? reason : null;
+
+  await review.save();
+  await updatePropertyRating(review.property); 
+
+  res.status(200).json({
+    success: true,
+    message: `Review ${isHidden ? "hidden" : "visible"} successfully`,
+  });
+});
+
+/* ======================================================
+   6️⃣ Review Analytics (Rounded)
+====================================================== */
+export const getReviewAnalytics = catchAsyncError(async (req, res) => {
+  const propertyId = req.params.propertyId;
+
+  const reviews = await Review.find({
+    property: propertyId,
+    isHidden: false,
+    isVerifiedStay: true,
+  });
+
+  const analytics = {
+    totalReviews: reviews.length,
+    avgRating: Number(
+      (
+        reviews.reduce((s, r) => s + r.rating, 0) /
+        (reviews.length || 1)
+      ).toFixed(1)
+    ),
+    cleanlinessAvg: Number(
+      (
+        reviews.reduce((s, r) => s + r.cleanliness, 0) /
+        (reviews.length || 1)
+      ).toFixed(1)
+    ),
+    comfortAvg: Number(
+      (
+        reviews.reduce((s, r) => s + r.comfort, 0) /
+        (reviews.length || 1)
+      ).toFixed(1)
+    ),
+    serviceAvg: Number(
+      (
+        reviews.reduce((s, r) => s + r.service, 0) /
+        (reviews.length || 1)
+      ).toFixed(1)
+    ),
+    locationAvg: Number(
+      (
+        reviews.reduce((s, r) => s + r.location, 0) /
+        (reviews.length || 1)
+      ).toFixed(1)
+    ),
+  };
+
+  res.status(200).json({
+    success: true,
+    analytics,
   });
 });

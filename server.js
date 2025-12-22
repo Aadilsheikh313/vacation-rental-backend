@@ -1,6 +1,8 @@
-process.env.TZ = "UTC";
+// process.env.TZ = "UTC";
+
 import app from "./app.js";
 import cloudinary from "cloudinary";
+import "./cron/bookingStatusUpdater.js";
 
 
 cloudinary.v2.config({
@@ -8,7 +10,6 @@ cloudinary.v2.config({
     api_key: process.env.CLOUDINARY_CLIENT_APIKEY,
     api_secret: process.env.CLOUDINARY_CLIENT_APISECRET
 })
-
 
 app.listen(process.env.PORT, () => {
     console.log(`The server was running on port ${process.env.PORT}`);

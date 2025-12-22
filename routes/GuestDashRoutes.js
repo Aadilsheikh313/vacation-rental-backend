@@ -15,6 +15,7 @@ router.get("/currentbooking", isAuthorized, GuestCurrentBookings);
 router.get("/upcommingbooking", isAuthorized, GuestUpcommingBookings);
 router.get("/cancelbooking", isAuthorized, GuestConcelBooking);
 
+
 export default router;
 
 
