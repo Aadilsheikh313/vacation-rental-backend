@@ -6,7 +6,6 @@ import { connectDB } from "./config/db.js";
 
 import tripRoutes from './routes/tripRoutes.js';
 import overpassRoutes from "./routes/overpassRoutes.js";
-import foodRoutes from './routes/foodRoutes.js';
 
 import { errorMiddleware } from "./middlewares/errorMiddleware.js";
 import { updateActivity } from './middlewares/updateLastActive.js';
@@ -74,7 +73,6 @@ app.use(updateActivity);
 // ✅ Routes
 app.use('/api/mytrip', tripRoutes);
 app.use("/api/overpass", overpassRoutes);
-app.use('/api/food', foodRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/property', propertyRoutes);
@@ -90,14 +88,14 @@ app.use('/api/v1', adminHomeDashRoutes);
 app.use('/api/v1', adminDashboardRoutes);
 app.use('/api/v1', adminHostRoutes);
 app.use('/api/v1', adminGuestRoutes);
-app.use('/api/host-verify', admihVerifyRoutes); 
+app.use('/api/host-verify', admihVerifyRoutes);
 app.use('/api/banned', adminBannedRoutes);
 app.use("/api/active/inactive", adminPropertyRoutes);
 app.use("/api/adminpost", adminPostRoutes);
 //==================== Admin Routes end =================
 app.use("/api/amenities", amenityRoutes);
-app.use("/api/polices",policyRoutes);
-app.use("/api/filter",filterRoutes);
+app.use("/api/polices", policyRoutes);
+app.use("/api/filter", filterRoutes);
 app.use('/api/page', paginationRoutes);
 app.use('/api/guestDash', guestRoutes);
 app.use('/api/userProfile', userRoutes);

@@ -57,6 +57,7 @@ const reviewSchema = new mongoose.Schema({
       trim: true,
     },
     repliedAt: Date,
+    updatedAt: Date,
   },
 
   helpfulCount: {

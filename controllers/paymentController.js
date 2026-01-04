@@ -9,10 +9,17 @@ import ErrorHandler from "../middlewares/errorMiddleware.js";
 import { catchAsyncError } from "../middlewares/catchAsyncError.js";
 
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_SECRET,
-});
+const getRazorpayInstance = () => {
+  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_SECRET) {
+    throw new Error("❌ Razorpay env keys missing");
+  }
+
+  return new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_SECRET,
+  });
+};
+
 
 // Convert rupees to paisa
 const toPaisa = (amount) => Math.round(Number(amount) * 100);
@@ -21,6 +28,7 @@ const toPaisa = (amount) => Math.round(Number(amount) * 100);
  * 🔹 Create Razorpay order for a booking
  */
 export const createOrder = catchAsyncError(async (req, res, next) => {
+  const razorpay = getRazorpayInstance();
   const { bookingId } = req.body;
 
   if (!bookingId) return next(new ErrorHandler("bookingId required", 400));
@@ -196,6 +204,7 @@ export const getPaymentStatus = catchAsyncError(async (req, res, next) => {
 
 // Edit extra payemt controller function 
 export const editExtraPayment = catchAsyncError(async (req, res, next) => {
+  const razorpay = getRazorpayInstance();
   const { bookingId } = req.body;
 
   const booking = await Booking.findById(bookingId).populate("property");

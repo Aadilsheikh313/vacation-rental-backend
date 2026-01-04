@@ -176,15 +176,26 @@ export const hostReplyToReview = catchAsyncError(async (req, res, next) => {
 
   const review = await Review.findById(req.params.reviewId).populate("property");
 
-  if (!review) return next(new ErrorHandler("Review not found", 404));
+  if (!review) {
+    return next(new ErrorHandler("Review not found", 404));
+  }
 
+  // ✅ only listing owner (host) can reply
   if (review.property.userId.toString() !== req.user._id.toString()) {
     return next(new ErrorHandler("Only host can reply", 403));
   }
 
+  // ✅ SAVE HOST INFO PROPERLY
   review.hostReply = {
     message,
     repliedAt: new Date(),
+    host: {
+      _id: req.user._id,
+      name: req.user.name,
+      avatar: {
+        url: req.user.avatar?.url || "",
+      },
+    },
   };
 
   await review.save();
@@ -196,26 +207,35 @@ export const hostReplyToReview = catchAsyncError(async (req, res, next) => {
   });
 });
 
+
 /* ======================================================
-   5️⃣ Admin Hide / Unhide Review
+   ADMIN: HIDE / UNHIDE REVIEW
 ====================================================== */
 export const toggleReviewVisibility = catchAsyncError(async (req, res, next) => {
   const { isHidden, reason } = req.body;
 
   const review = await Review.findById(req.params.reviewId);
-  if (!review) return next(new ErrorHandler("Review not found", 404));
+  if (!review) {
+    return next(new ErrorHandler("Review not found", 404));
+  }
 
   review.isHidden = isHidden;
-  review.hiddenReason = isHidden ? reason : null;
+  review.hiddenReason = isHidden ? reason || "Hidden by admin" : null;
 
   await review.save();
-  await updatePropertyRating(review.property); 
+
+  // ⭐ Recalculate property rating after hide/show
+  await updatePropertyRating(review.property);
 
   res.status(200).json({
     success: true,
-    message: `Review ${isHidden ? "hidden" : "visible"} successfully`,
+    message: isHidden
+      ? "Review hidden successfully"
+      : "Review is now visible",
+    review,
   });
 });
+
 
 /* ======================================================
    6️⃣ Review Analytics (Rounded)
@@ -264,6 +284,58 @@ export const getReviewAnalytics = catchAsyncError(async (req, res) => {
   };
 
   res.status(200).json({
+    success: true,
+    analytics,
+  });
+});
+
+/* ======================================================
+   6️⃣ Review Analytics Admin(Rounded)
+====================================================== */
+export const getReviewAnalyticsAdmin = catchAsyncError(async (req, res, next) => {
+  const propertyId = req.params.propertyId;
+
+  const reviews = await Review.find({
+    property: propertyId,
+    isVerifiedStay: true,
+  });
+
+  // ✅ HANDLE NO REVIEWS FIRST
+  if (reviews.length === 0) {
+    return res.status(200).json({
+      success: true,
+      analytics: {
+        totalReviews: 0,
+        avgRating: 0,
+        cleanlinessAvg: 0,
+        comfortAvg: 0,
+        serviceAvg: 0,
+        locationAvg: 0,
+      },
+    });
+  }
+
+  // ✅ NORMAL CALCULATION
+  const analytics = {
+    totalReviews: reviews.length,
+    avgRating: Number(
+      (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
+    ),
+    cleanlinessAvg: Number(
+      (reviews.reduce((s, r) => s + r.cleanliness, 0) / reviews.length).toFixed(1)
+    ),
+    comfortAvg: Number(
+      (reviews.reduce((s, r) => s + r.comfort, 0) / reviews.length).toFixed(1)
+    ),
+    serviceAvg: Number(
+      (reviews.reduce((s, r) => s + r.service, 0) / reviews.length).toFixed(1)
+    ),
+    locationAvg: Number(
+      (reviews.reduce((s, r) => s + r.location, 0) / reviews.length).toFixed(1)
+    ),
+  };
+
+  return res.status(200).json({
     success: true,
     analytics,
   });

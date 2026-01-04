@@ -56,6 +56,32 @@ export const getSinglePropertyAdmin = catchAsyncError(async (req, res, next) => 
         ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
         : 0;
 
+    const completedBookings = bookings.filter(
+        b => b.bookingStatus === "completed"
+    ).length;
+
+    const cancelledBookings = bookings.filter(
+        b => b.bookingStatus === "cancelled"
+    ).length;
+
+    const onlineRevenue = bookings
+        .filter(b => b.paymentMethod === "razorpay" && b.paymentStatus === "paid")
+        .reduce((sum, b) => sum + b.totalAmount, 0);
+
+    const cashRevenue = bookings
+        .filter(b => b.paymentMethod === "cash" && b.paymentStatus === "paid")
+        .reduce((sum, b) => sum + b.totalAmount, 0);
+
+
+    const totalTax = bookings.reduce(
+        (sum, b) => sum + (b.taxAmount || 0),
+        0
+    );
+    const serviceCharge = payments.reduce(
+        (sum, p) => sum + (p.platformFee || 0),
+        0
+    );
+
     // ✅ 8. Final Response
     res.status(200).json({
         success: true,
@@ -63,8 +89,19 @@ export const getSinglePropertyAdmin = catchAsyncError(async (req, res, next) => 
         reviews,
         bookings,
         payments,
-        totalRevenue,
+
         totalBookings,
+        completedBookings,
+        cancelledBookings,
+
+        totalRevenue,
+        onlineRevenue,
+        cashRevenue,
+
+        totalTax,
+        serviceCharge,
+
         avgRating,
     });
+
 });

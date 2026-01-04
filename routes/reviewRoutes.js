@@ -3,6 +3,7 @@ import {
     editReview,
     getAllReviewsForProperty,
     getReviewAnalytics,
+    getReviewAnalyticsAdmin,
     hostReplyToReview,
     postReview,
     toggleReviewVisibility
@@ -24,7 +25,7 @@ router.get("/property/:propertyId/analytics", isAuthorized, getReviewAnalytics);
 
 // Admin
 router.patch("/review/:reviewId/visibility", isAuthorized, isAdmin, toggleReviewVisibility);
-router.get("/admin/property/:propertyId/analytics", isAuthorized, isAdmin, getReviewAnalytics);
+router.get("/admin/property/:propertyId/analytics", isAuthorized, isAdmin, getReviewAnalyticsAdmin);
 
 
 export default router
