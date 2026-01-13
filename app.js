@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+dotenv.config();  
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { connectDB } from "./config/db.js";
@@ -41,7 +42,6 @@ import userRoutes from './routes/userRouter.js';
 
 
 const app = express();
-dotenv.config();
 
 // ✅ Allowed origins cleanup
 const allowedOrigins = process.env.FRONTEND_URL
