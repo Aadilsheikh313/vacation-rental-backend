@@ -5,9 +5,6 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { connectDB } from "./config/db.js";
 
-import tripRoutes from './routes/tripRoutes.js';
-import overpassRoutes from "./routes/overpassRoutes.js";
-
 import { errorMiddleware } from "./middlewares/errorMiddleware.js";
 import { updateActivity } from './middlewares/updateLastActive.js';
 
@@ -18,7 +15,6 @@ import reviewRoutes from "./routes/reviewRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import invoiceRoutes from "./routes/invoiceRoutes.js";
-import geocodeRouter from "./routes/geocode.js";
 import globalSearchRoutes from "./routes/globalSearchRoutes.js";
 
 //==================== Admin Routes start =================
@@ -54,7 +50,7 @@ app.use(cors({
       callback(null, true);
     } else {
       console.error("❌ CORS blocked:", origin);
-      callback(null, false); // <-- don’t crash, just reject
+      callback(null, false); 
     }
   },
   credentials: true,
@@ -71,16 +67,12 @@ app.use(express.urlencoded({ extended: true }));
 app.use(updateActivity);
 
 // ✅ Routes
-app.use('/api/mytrip', tripRoutes);
-app.use("/api/overpass", overpassRoutes);
-
 app.use('/api/auth', authRoutes);
 app.use('/api/property', propertyRoutes);
 app.use('/api/review', reviewRoutes);
 app.use('/api/booking', bookingRoutes);
 app.use('/api/invoice', invoiceRoutes);
 app.use('/api/payment', paymentRoutes);
-app.use('/api', geocodeRouter);
 app.use("/api/search", globalSearchRoutes);
 //==================== Admin Routes start =================
 app.use('/api/v1', adminRoutes);
